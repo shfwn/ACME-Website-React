@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTaskContext, User } from '@/lib/store/task-store';
-import { Users, UserPlus, Shield, Trash2, CheckCircle2, Lock } from 'lucide-react';
+import { useTaskContext } from '@/lib/store/task-store';
+import { Users, UserPlus, Trash2, Lock } from 'lucide-react';
 
 export default function UserManagementPage() {
   const { currentUser, users, addUser, updateUserRole, deleteUser } = useTaskContext();
@@ -119,7 +119,7 @@ export default function UserManagementPage() {
             <label className="text-xs font-bold text-slate-700">Peran Akses</label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as any)}
+              onChange={e => setRole(e.target.value as 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER')}
               className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 cursor-pointer font-semibold"
             >
               <option value="MEMBER">Member (Eksekutor)</option>
@@ -181,7 +181,7 @@ export default function UserManagementPage() {
                   <select
                     value={user.role}
                     disabled={user.id === currentUser.id}
-                    onChange={e => updateUserRole(user.id, e.target.value as any)}
+                    onChange={e => updateUserRole(user.id, e.target.value as 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER')}
                     className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border cursor-pointer ${getRoleBadgeStyle(
                       user.role
                     )}`}

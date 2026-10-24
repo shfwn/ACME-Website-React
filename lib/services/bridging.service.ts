@@ -123,7 +123,7 @@ export async function handleTaskCompletionHandoff(taskId: string, actorId: strin
     
     // Check if ALL prerequisites for this blocked task are now completed
     const allPrerequisitesDone = blockedTask.prerequisites.every(
-      (prereq: any) => prereq.dependsOnTask.status.isDoneState
+      (prereq: { dependsOnTask: { status: { isDoneState: boolean } } }) => prereq.dependsOnTask.status.isDoneState
     );
 
     if (allPrerequisitesDone && blockedTask.assigneeId) {
@@ -180,9 +180,9 @@ export async function getTeamWorkload(workspaceId: string) {
     }
   });
 
-  return members.map((m: any) => {
+  return members.map(m => {
     const activeTasks = m.user.assignedTasks;
-    const totalEstimatedHours = activeTasks.reduce((acc: number, t: any) => acc + (t.estimatedHours || 0), 0);
+    const totalEstimatedHours = activeTasks.reduce((acc: number, t: { estimatedHours: number | null }) => acc + (t.estimatedHours || 0), 0);
     const capacity = m.user.weeklyCapacityHours || 40;
     const loadPercentage = capacity > 0 ? Math.round((totalEstimatedHours / capacity) * 100) : 0;
 

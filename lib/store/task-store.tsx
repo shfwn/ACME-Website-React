@@ -8,7 +8,7 @@ export interface User {
   name: string;
   email: string;
   avatarUrl: string;
-  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' | 'MILT';
   weeklyCapacityHours: number;
 }
 
@@ -83,6 +83,41 @@ export interface DocWiki {
   updatedAt: string;
 }
 
+export interface PersonalTodo {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  targetDate: string; // YYYY-MM-DD
+  startTime?: string; // "09:00"
+  endTime?: string;   // "10:30"
+  isCompleted: boolean;
+  priority: Priority;
+  category: string;   // "Kerja" | "Pribadi" | "Fokus" | "Penting"
+  reminderAt?: string;
+  createdAt: string;
+}
+
+export interface PersonalNote {
+  id: string;
+  userId: string;
+  title: string;
+  contentMarkdown: string;
+  linkedDate?: string; // YYYY-MM-DD
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedSheetLink {
+  id: string;
+  userId: string;
+  title: string;
+  url: string;
+  category: string;
+  createdAt: string;
+}
+
 export interface ActivityLog {
   id: string;
   projectId?: string;
@@ -114,6 +149,14 @@ export interface Project {
 
 export const INITIAL_USERS: User[] = [
   {
+    id: 'u-milt',
+    name: 'MILT Executive',
+    email: 'milt1058@gmail.com',
+    avatarUrl: '/assets/images/profile/user-1.jpg',
+    role: 'MILT',
+    weeklyCapacityHours: 40,
+  },
+  {
     id: 'u-budi',
     name: 'Budi Santoso',
     email: 'owner@company.com',
@@ -136,6 +179,65 @@ export const INITIAL_USERS: User[] = [
     avatarUrl: '/assets/images/profile/user-3.jpg',
     role: 'MEMBER',
     weeklyCapacityHours: 40,
+  },
+];
+
+const todayIso = new Date().toISOString().split('T')[0];
+
+export const INITIAL_PERSONAL_TODOS: PersonalTodo[] = [
+  {
+    id: 'pt-1',
+    userId: 'u-milt',
+    title: 'Review Rencana Strategis & Roadmap Sistem',
+    description: 'Pengecekan timeline dan alokasi sumber daya kuartal ini.',
+    targetDate: todayIso,
+    startTime: '09:00',
+    endTime: '10:30',
+    isCompleted: false,
+    priority: 'HIGH',
+    category: 'Kerja',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'pt-2',
+    userId: 'u-milt',
+    title: 'Sinkronisasi Spreadsheet Keuangan & Operasional',
+    description: 'Buka Google Sheet master tracker di panel samping.',
+    targetDate: todayIso,
+    startTime: '13:30',
+    endTime: '15:00',
+    isCompleted: true,
+    priority: 'MEDIUM',
+    category: 'Fokus',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const INITIAL_PERSONAL_NOTES: PersonalNote[] = [
+  {
+    id: 'pn-1',
+    userId: 'u-milt',
+    title: 'Catatan Harian Eksekutif',
+    contentMarkdown: `### Agenda Utama Hari Ini
+- [x] Tinjau arsitektur integrasi sistem
+- [ ] Monitor performa dan efisiensi waktu kerja
+
+> Catatan: Gunakan fitur Spreadsheet Hub untuk memantau data Google Drive tanpa perlu membuka tab terpisah.`,
+    linkedDate: todayIso,
+    tags: ['Eksekutif', 'Briefing'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const INITIAL_SAVED_SHEETS: SavedSheetLink[] = [
+  {
+    id: 'sh-1',
+    userId: 'u-milt',
+    title: 'Master Roadmap & Tracker 2026',
+    url: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing',
+    category: 'Perencanaan',
+    createdAt: new Date().toISOString(),
   },
 ];
 
@@ -319,7 +421,7 @@ interface TaskContextType {
   deleteTimeLog: (taskId: string, logId: string) => void;
   addDependency: (taskId: string, dependsOnTaskId: string) => { success: boolean; error?: string };
   removeDependency: (taskId: string, dependsOnTaskId: string) => void;
-  saveDoc: (doc: Partial<DocWiki>) => void;
+  saveDoc: (doc: Partial<DocWiki>) => DocWiki | undefined;
   deleteDoc: (docId: string) => void;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
@@ -334,6 +436,19 @@ interface TaskContextType {
     status: 'LIGHT' | 'OPTIMAL' | 'OVERLOAD';
     tasks: Task[];
   }>;
+  // MILT Personal Executive Space
+  personalTodos: PersonalTodo[];
+  personalNotes: PersonalNote[];
+  savedSheets: SavedSheetLink[];
+  addPersonalTodo: (data: Omit<PersonalTodo, 'id' | 'createdAt' | 'userId'>) => void;
+  togglePersonalTodo: (id: string) => void;
+  updatePersonalTodo: (id: string, data: Partial<PersonalTodo>) => void;
+  deletePersonalTodo: (id: string) => void;
+  rolloverPendingTodos: (targetDate: string) => number;
+  savePersonalNote: (data: Partial<PersonalNote>) => PersonalNote | undefined;
+  deletePersonalNote: (id: string) => void;
+  saveSheetLink: (title: string, url: string, category?: string) => void;
+  deleteSheetLink: (id: string) => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -350,6 +465,11 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<ActivityLog[]>(INITIAL_ACTIVITIES);
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [personalTodos, setPersonalTodos] = useState<PersonalTodo[]>(INITIAL_PERSONAL_TODOS);
+  const [personalNotes, setPersonalNotes] = useState<PersonalNote[]>(INITIAL_PERSONAL_NOTES);
+  const [savedSheets, setSavedSheets] = useState<SavedSheetLink[]>(INITIAL_SAVED_SHEETS);
+
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Load persisted state from localStorage
   useEffect(() => {
@@ -358,26 +478,110 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       let loadedUsers = INITIAL_USERS;
       if (savedUsers) {
         loadedUsers = JSON.parse(savedUsers);
-        setUsers(loadedUsers);
       }
 
+      const savedTasks = localStorage.getItem('acme_tasks');
+      const loadedTasks = savedTasks ? JSON.parse(savedTasks) : INITIAL_TASKS;
+
+      const savedDocs = localStorage.getItem('acme_docs');
+      const loadedDocs = savedDocs ? JSON.parse(savedDocs) : INITIAL_DOCS;
+
+      const savedNotifs = localStorage.getItem('acme_notifications');
+      const loadedNotifs = savedNotifs ? JSON.parse(savedNotifs) : INITIAL_NOTIFICATIONS;
+
+      const savedActs = localStorage.getItem('acme_activities');
+      const loadedActs = savedActs ? JSON.parse(savedActs) : INITIAL_ACTIVITIES;
+
+      const savedPersonalTodos = localStorage.getItem('acme_personal_todos');
+      const loadedPersonalTodos = savedPersonalTodos ? JSON.parse(savedPersonalTodos) : INITIAL_PERSONAL_TODOS;
+
+      const savedPersonalNotes = localStorage.getItem('acme_personal_notes');
+      const loadedPersonalNotes = savedPersonalNotes ? JSON.parse(savedPersonalNotes) : INITIAL_PERSONAL_NOTES;
+
+      const savedSheetsData = localStorage.getItem('acme_saved_sheets');
+      const loadedSavedSheets = savedSheetsData ? JSON.parse(savedSheetsData) : INITIAL_SAVED_SHEETS;
       const savedUserId = localStorage.getItem('acme_active_user_id');
-      if (savedUserId) {
-        const found = loadedUsers.find(u => u.id === savedUserId);
-        if (found) setCurrentUser(found);
-        else setCurrentUser(null);
-      } else {
+      const activeUser = savedUserId ? loadedUsers.find(u => u.id === savedUserId) || null : null;
+
+      queueMicrotask(() => {
+        if (savedUsers) setUsers(loadedUsers);
+        if (savedTasks) setTasks(loadedTasks);
+        if (savedDocs) setDocs(loadedDocs);
+        if (savedNotifs) setNotifications(loadedNotifs);
+        if (savedActs) setActivities(loadedActs);
+        if (savedPersonalTodos) setPersonalTodos(loadedPersonalTodos);
+        if (savedPersonalNotes) setPersonalNotes(loadedPersonalNotes);
+        if (savedSheetsData) setSavedSheets(loadedSavedSheets);
+        setCurrentUser(activeUser);
+        setIsLoaded(true);
+      });
+    } catch {
+      queueMicrotask(() => {
         setCurrentUser(null);
-      }
-    } catch (err) {
-      setCurrentUser(null);
+        setIsLoaded(true);
+      });
     }
-    setIsLoaded(true);
   }, []);
+
+  const updateAndPersistTasks = (updater: (prev: Task[]) => Task[]) => {
+    setTasks(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_tasks', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateAndPersistDocs = (updater: (prev: DocWiki[]) => DocWiki[]) => {
+    setDocs(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_docs', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateAndPersistNotifs = (updater: (prev: Notification[]) => Notification[]) => {
+    setNotifications(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_notifications', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateAndPersistActs = (updater: (prev: ActivityLog[]) => ActivityLog[]) => {
+    setActivities(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_activities', JSON.stringify(next));
+      return next;
+    });
+  };
+  const updateAndPersistPersonalTodos = (updater: (prev: PersonalTodo[]) => PersonalTodo[]) => {
+    setPersonalTodos(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_personal_todos', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateAndPersistPersonalNotes = (updater: (prev: PersonalNote[]) => PersonalNote[]) => {
+    setPersonalNotes(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_personal_notes', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateAndPersistSavedSheets = (updater: (prev: SavedSheetLink[]) => SavedSheetLink[]) => {
+    setSavedSheets(prev => {
+      const next = updater(prev);
+      localStorage.setItem('acme_saved_sheets', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => {
+    clearTimeout(toastTimerRef.current!);
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
     }, 3000);
   };
@@ -448,6 +652,12 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     const updated = users.filter(u => u.id !== userId);
     setUsers(updated);
     localStorage.setItem('acme_users', JSON.stringify(updated));
+
+    // Clean orphaned task assignees
+    updateAndPersistTasks(prev =>
+      prev.map(t => (t.assigneeId === userId ? { ...t, assigneeId: undefined } : t))
+    );
+
     showToast('Pengguna telah dihapus dari tim.');
   };
 
@@ -473,14 +683,14 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   // 1. Toggle Subtask
   const toggleSubtask = (taskId: string, subtaskId: string) => {
     if (!currentUser) return;
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => {
         if (t.id !== taskId) return t;
         const updatedSubtasks = t.subtasks.map(s => {
           if (s.id !== subtaskId) return s;
           const nextState = !s.isCompleted;
 
-          setActivities(acts => [
+          updateAndPersistActs(acts => [
             {
               id: 'act-' + Date.now(),
               projectId: t.projectId,
@@ -502,7 +712,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   const addSubtask = (taskId: string, title: string) => {
     if (!title.trim()) return;
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => {
         if (t.id !== taskId) return t;
         const newSub: Subtask = {
@@ -518,7 +728,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteSubtask = (taskId: string, subtaskId: string) => {
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => {
         if (t.id !== taskId) return t;
         return { ...t, subtasks: t.subtasks.filter(s => s.id !== subtaskId) };
@@ -532,11 +742,11 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     const targetStatus = project.statuses.find(s => s.id === newStatusId);
     if (!targetStatus) return;
 
-    setTasks(prev => {
+    updateAndPersistTasks(prev => {
       const task = prev.find(t => t.id === taskId);
       if (!task) return prev;
 
-      setActivities(acts => [
+      updateAndPersistActs(acts => [
         {
           id: 'act-' + Date.now(),
           projectId: task.projectId,
@@ -553,7 +763,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         const dependentTasks = prev.filter(t => t.dependencies.includes(taskId));
         dependentTasks.forEach(depTask => {
           if (depTask.assigneeId) {
-            setNotifications(notifs => [
+            updateAndPersistNotifs(notifs => [
               {
                 id: 'notif-' + Date.now() + Math.random(),
                 userId: depTask.assigneeId!,
@@ -596,9 +806,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       timeLogs: [],
     };
 
-    setTasks(prev => [newTask, ...prev]);
+    updateAndPersistTasks(prev => [newTask, ...prev]);
 
-    setActivities(acts => [
+    updateAndPersistActs(acts => [
       {
         id: 'act-' + Date.now(),
         projectId: project.id,
@@ -623,7 +833,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, ...data } : t)));
+    updateAndPersistTasks(prev => prev.map(t => (t.id === taskId ? { ...t, ...data } : t)));
     showToast('Perubahan tugas disimpan.');
     return true;
   };
@@ -638,7 +848,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    setTasks(prev => prev.filter(t => t.id !== taskId));
+    updateAndPersistTasks(prev => prev.filter(t => t.id !== taskId));
     if (selectedTaskId === taskId) setSelectedTaskId(null);
     showToast('Tugas telah dihapus.');
     return true;
@@ -656,13 +866,13 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
     };
 
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, comments: [...t.comments, newComment] } : t))
     );
 
     mentions.forEach(mentionedUserId => {
       if (mentionedUserId !== currentUser.id) {
-        setNotifications(notifs => [
+        updateAndPersistNotifs(notifs => [
           {
             id: 'notif-' + Date.now() + Math.random(),
             userId: mentionedUserId,
@@ -678,7 +888,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    setActivities(acts => [
+    updateAndPersistActs(acts => [
       {
         id: 'act-' + Date.now(),
         projectId: project.id,
@@ -695,7 +905,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   const deleteComment = (taskId: string, commentId: string) => {
     if (!currentUser) return;
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, comments: t.comments.filter(c => c.id !== commentId) } : t))
     );
     showToast('Komentar telah dihapus.');
@@ -713,11 +923,11 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
     };
 
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, timeLogs: [newLog, ...t.timeLogs] } : t))
     );
 
-    setActivities(acts => [
+    updateAndPersistActs(acts => [
       {
         id: 'act-' + Date.now(),
         projectId: project.id,
@@ -736,7 +946,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   const deleteTimeLog = (taskId: string, logId: string) => {
     if (!currentUser) return;
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, timeLogs: t.timeLogs.filter(tl => tl.id !== logId) } : t))
     );
     showToast('Catatan waktu dihapus.');
@@ -769,7 +979,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => {
         if (t.id !== taskId) return t;
         if (t.dependencies.includes(dependsOnTaskId)) return t;
@@ -782,7 +992,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   };
 
   const removeDependency = (taskId: string, dependsOnTaskId: string) => {
-    setTasks(prev =>
+    updateAndPersistTasks(prev =>
       prev.map(t => {
         if (t.id !== taskId) return t;
         return { ...t, dependencies: t.dependencies.filter(id => id !== dependsOnTaskId) };
@@ -792,54 +1002,176 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   };
 
   // 9. Docs
-  const saveDoc = (docData: Partial<DocWiki>) => {
-    if (!currentUser) return;
+  const saveDoc = (docData: Partial<DocWiki>): DocWiki | undefined => {
+    if (!currentUser) return undefined;
     if (docData.id) {
-      setDocs(prev =>
-        prev.map(d => (d.id === docData.id ? { ...d, ...docData, updatedAt: new Date().toISOString() } : d))
+      let updatedDoc: DocWiki | undefined;
+      updateAndPersistDocs(prev =>
+        prev.map(d => {
+          if (d.id === docData.id) {
+            updatedDoc = { ...d, ...docData, updatedAt: new Date().toISOString() };
+            return updatedDoc;
+          }
+          return d;
+        })
       );
+      showToast('Dokumen berhasil disimpan.');
+      return updatedDoc;
     } else {
       const newDoc: DocWiki = {
         id: 'doc-' + Date.now(),
-        projectId: project.id,
+        projectId: docData.projectId || project.id,
         creatorId: currentUser.id,
         title: docData.title || 'Dokumen Baru',
         contentMarkdown: docData.contentMarkdown || '',
         linkedTaskIds: docData.linkedTaskIds || [],
         updatedAt: new Date().toISOString(),
       };
-      setDocs(prev => [newDoc, ...prev]);
+      updateAndPersistDocs(prev => [newDoc, ...prev]);
+      showToast('Dokumen berhasil disimpan.');
+      return newDoc;
     }
-    showToast('Dokumen berhasil disimpan.');
   };
-
   const deleteDoc = (docId: string) => {
     if (!currentUser) return;
-    setDocs(prev => prev.filter(d => d.id !== docId));
+    updateAndPersistDocs(prev => prev.filter(d => d.id !== docId));
     showToast('Dokumen telah dihapus.');
   };
 
   // 10. Notifications
   const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
+    updateAndPersistNotifs(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
   const markAllNotificationsAsRead = () => {
     if (!currentUser) return;
-    setNotifications(prev =>
+    updateAndPersistNotifs(prev =>
       prev.map(n => (n.userId === currentUser.id ? { ...n, isRead: true } : n))
     );
   };
 
   const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    updateAndPersistNotifs(prev => prev.filter(n => n.id !== id));
     showToast('Notifikasi dihapus.');
   };
 
   const clearAllNotifications = () => {
     if (!currentUser) return;
-    setNotifications(prev => prev.filter(n => n.userId !== currentUser.id));
+    updateAndPersistNotifs(prev => prev.filter(n => n.userId !== currentUser.id));
     showToast('Semua notifikasi dibersihkan.');
+  };
+
+  // MILT Personal Executive Workspace Actions
+  const addPersonalTodo = (data: Omit<PersonalTodo, 'id' | 'createdAt' | 'userId'>) => {
+    if (!data.title.trim()) return;
+    const newTodo: PersonalTodo = {
+      id: 'pt-' + Date.now(),
+      userId: currentUser?.id || 'u-milt',
+      title: data.title.trim(),
+      description: data.description?.trim(),
+      targetDate: data.targetDate,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      isCompleted: false,
+      priority: data.priority || 'MEDIUM',
+      category: data.category || 'Kerja',
+      reminderAt: data.reminderAt,
+      createdAt: new Date().toISOString(),
+    };
+    updateAndPersistPersonalTodos(prev => [newTodo, ...prev]);
+    showToast('Agenda to-do pribadi ditambahkan.');
+  };
+
+  const togglePersonalTodo = (id: string) => {
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
+    );
+  };
+
+  const updatePersonalTodo = (id: string, data: Partial<PersonalTodo>) => {
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...data } : t))
+    );
+    showToast('Agenda diperbarui.');
+  };
+
+  const deletePersonalTodo = (id: string) => {
+    updateAndPersistPersonalTodos(prev => prev.filter(t => t.id !== id));
+    showToast('Agenda to-do dihapus.');
+  };
+
+  const rolloverPendingTodos = (targetDate: string): number => {
+    let count = 0;
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => {
+        if (!t.isCompleted && t.targetDate < targetDate) {
+          count++;
+          return { ...t, targetDate };
+        }
+        return t;
+      })
+    );
+    if (count > 0) {
+      showToast(`${count} to-do tertunda berhasil dipindahkan ke hari ini.`);
+    } else {
+      showToast('Tidak ada to-do tertunda untuk dipindahkan.');
+    }
+    return count;
+  };
+
+  const savePersonalNote = (data: Partial<PersonalNote>): PersonalNote | undefined => {
+    if (data.id) {
+      let updatedNote: PersonalNote | undefined;
+      updateAndPersistPersonalNotes(prev =>
+        prev.map(n => {
+          if (n.id === data.id) {
+            updatedNote = { ...n, ...data, updatedAt: new Date().toISOString() };
+            return updatedNote;
+          }
+          return n;
+        })
+      );
+      showToast('Catatan berhasil disimpan.');
+      return updatedNote;
+    } else {
+      const newNote: PersonalNote = {
+        id: 'pn-' + Date.now(),
+        userId: currentUser?.id || 'u-milt',
+        title: data.title || 'Catatan Baru',
+        contentMarkdown: data.contentMarkdown || '',
+        linkedDate: data.linkedDate,
+        tags: data.tags || ['Pribadi'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      updateAndPersistPersonalNotes(prev => [newNote, ...prev]);
+      showToast('Catatan baru berhasil dibuat.');
+      return newNote;
+    }
+  };
+
+  const deletePersonalNote = (id: string) => {
+    updateAndPersistPersonalNotes(prev => prev.filter(n => n.id !== id));
+    showToast('Catatan dihapus.');
+  };
+
+  const saveSheetLink = (title: string, url: string, category: string = 'Spreadsheet') => {
+    if (!title.trim() || !url.trim()) return;
+    const newSheet: SavedSheetLink = {
+      id: 'sh-' + Date.now(),
+      userId: currentUser?.id || 'u-milt',
+      title: title.trim(),
+      url: url.trim(),
+      category: category.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    updateAndPersistSavedSheets(prev => [newSheet, ...prev]);
+    showToast('Link Google Sheet / Drive berhasil disimpan.');
+  };
+
+  const deleteSheetLink = (id: string) => {
+    updateAndPersistSavedSheets(prev => prev.filter(s => s.id !== id));
+    showToast('Bookmark sheet dihapus.');
   };
 
   // Computed Roll-up Progress
@@ -940,6 +1272,18 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         clearAllNotifications,
         getProjectProgress,
         getWorkloadData,
+        personalTodos,
+        personalNotes,
+        savedSheets,
+        addPersonalTodo,
+        togglePersonalTodo,
+        updatePersonalTodo,
+        deletePersonalTodo,
+        rolloverPendingTodos,
+        savePersonalNote,
+        deletePersonalNote,
+        saveSheetLink,
+        deleteSheetLink,
       }}
     >
       {children}

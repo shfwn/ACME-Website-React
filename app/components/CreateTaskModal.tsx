@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTaskContext, Priority } from '@/lib/store/task-store';
-import { X, Target, UserPlus } from 'lucide-react';
+import { X, Target } from 'lucide-react';
 
 interface CreateTaskModalProps {
   onClose: () => void;
@@ -144,7 +144,7 @@ export function CreateTaskModal({ onClose, defaultStatusId }: CreateTaskModalPro
               <label className="text-[11px] font-bold text-slate-500 uppercase">Tingkat Urgensi</label>
               <select
                 value={priority}
-                onChange={e => setPriority(e.target.value as any)}
+                onChange={e => setPriority(e.target.value as Priority)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 cursor-pointer font-medium"
               >
                 <option value="LOW">Biasa</option>

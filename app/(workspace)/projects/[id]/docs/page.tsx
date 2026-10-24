@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import { useTaskContext, DocWiki } from '@/lib/store/task-store';
 import { FileText, Plus, Save, Link as LinkIcon, Trash2 } from 'lucide-react';
 
-export default function DocsPage() {
-  const { docs, tasks, saveDoc, deleteDoc, currentUser, setSelectedTaskId } = useTaskContext();
+export default function DocsPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
+  const { docs, tasks, project, saveDoc, deleteDoc, currentUser, setSelectedTaskId } = useTaskContext();
+  const activeProjectId = resolvedParams.id;
   const [selectedDocId, setSelectedDocId] = useState<string>(docs[0]?.id || '');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -24,7 +26,13 @@ export default function DocsPage() {
   const handleCreateDoc = () => {
     const newTitle = 'Dokumen Baru Tanpa Judul';
     const newContent = '# Judul Panduan\n\nTulis panduan atau briefing tugas di sini...';
-    saveDoc({ title: newTitle, contentMarkdown: newContent });
+    const created = saveDoc({ projectId: activeProjectId || project.id, title: newTitle, contentMarkdown: newContent });
+    if (created) {
+      setSelectedDocId(created.id);
+      setTitle(created.title);
+      setContentMarkdown(created.contentMarkdown);
+      setIsEditing(true);
+    }
   };
 
   const handleDeleteDoc = () => {

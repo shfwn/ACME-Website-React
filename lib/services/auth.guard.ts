@@ -2,6 +2,7 @@ import { Role } from '@prisma/client';
 import prisma from '../db/prisma';
 
 const ROLE_HIERARCHY: Record<Role, number> = {
+  MILT: 5,
   OWNER: 4,
   ADMIN: 3,
   MEMBER: 2,

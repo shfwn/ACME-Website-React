@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useTaskContext, Task } from '@/lib/store/task-store';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTaskContext } from '@/lib/store/task-store';
 import { isDateToday, isDateOverdue } from '@/lib/utils/timezone';
 import { calculateProgress } from '@/lib/utils/progress';
 import {
@@ -28,6 +29,8 @@ export default function MyTasksPage() {
     setSelectedTaskId,
     addTimeLog,
   } = useTaskContext();
+  const router = useRouter();
+  useEffect(() => { if (currentUser?.role === 'MILT') { router.replace('/milt/todos'); } }, [currentUser, router]);
   const [filter, setFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'done'>('all');
 
   if (!currentUser) return null;

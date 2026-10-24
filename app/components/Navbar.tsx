@@ -1,61 +1,103 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTaskContext } from '@/lib/store/task-store';
-import { Bell, Plus, LogOut, Sparkles, Lock } from 'lucide-react';
+import { Bell, Plus, LogOut, Menu, Calendar as CalendarIcon } from 'lucide-react';
+import { logoutAction } from '@/app/actions/auth.actions';
 
 interface NavbarProps {
   onOpenCreateTask?: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export function Navbar({ onOpenCreateTask }: NavbarProps) {
+export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
   const router = useRouter();
-  const { currentUser, logout, notifications, markAllNotificationsAsRead } = useTaskContext();
+  const { currentUser, logout, notifications, markAllNotificationsAsRead, personalTodos } = useTaskContext();
   const [showNotifMenu, setShowNotifMenu] = useState(false);
 
   if (!currentUser) return null;
 
+  const isMilt = currentUser.role === 'MILT';
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  const todayActiveTodosCount = personalTodos.filter(t => t.targetDate === todayIso && !t.isCompleted).length;
+
+  const formattedDate = today.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
   const unreadNotifs = notifications.filter(n => n.userId === currentUser.id && !n.isRead);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     logout();
     router.push('/login');
+    await logoutAction();
   };
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between z-10 select-none shadow-2xs">
-      {/* Left: Status & Role Active Badge */}
+    <header className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between z-10 select-none shadow-2xs">
+      {/* Left: Mobile hamburger + Clean Status / Date */}
       <div className="flex items-center gap-3">
-        <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Otomasi Real-time Aktif</span>
-        </span>
+        <button
+          onClick={onToggleSidebar}
+          className="p-1.5 rounded-xl text-slate-600 hover:bg-slate-100 md:hidden cursor-pointer"
+          title="Buka Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
 
-        <span className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 font-medium">
-          <Lock className="w-3 h-3 text-slate-500" />
-          <span>Isolasi Hak Edit: Khusus Pembuat</span>
-        </span>
+        {isMilt ? (
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
+              <CalendarIcon className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{formattedDate}</span>
+            </div>
+
+            {todayActiveTodosCount > 0 && (
+              <Link
+                href="/milt/todos"
+                className="flex items-center gap-1.5 text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-xl hover:bg-amber-100 transition-colors"
+                title={`${todayActiveTodosCount} agenda to-do aktif hari ini`}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>{todayActiveTodosCount} Agenda Hari Ini</span>
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-3 py-1 bg-slate-100 text-slate-700 rounded-xl border border-slate-200">
+              Workspace Tim
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Right: Notification, Create Task, User Profile & Logout */}
-      <div className="flex items-center gap-3">
-        {/* Create Task Button */}
-        {onOpenCreateTask && (
+      {/* Right: Notifications, Create Task (non-MILT only), User Profile & Logout */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Create Task Button (Only for team roles) */}
+        {!isMilt && onOpenCreateTask && (
           <button
             onClick={onOpenCreateTask}
             className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Buat Tugas Baru</span>
+            <span>Tugas Baru</span>
           </button>
         )}
 
-        {/* Notifications Dropdown */}
-        <div className="relative">
+        {/* Notifications Dropdown (Team roles only) */}
+        {!isMilt && (
+          <div className="relative">
           <button
             onClick={() => setShowNotifMenu(!showNotifMenu)}
             className="relative p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Notifikasi"
           >
             <Bell className="w-4 h-4" />
             {unreadNotifs.length > 0 && (
@@ -66,7 +108,7 @@ export function Navbar({ onOpenCreateTask }: NavbarProps) {
           {showNotifMenu && (
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in">
               <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-900">Pemberitahuan Estafet</span>
+                <span className="text-xs font-extrabold text-slate-900">Notifikasi</span>
                 {unreadNotifs.length > 0 && (
                   <button
                     onClick={markAllNotificationsAsRead}
@@ -103,23 +145,24 @@ export function Navbar({ onOpenCreateTask }: NavbarProps) {
             </div>
           )}
         </div>
+        )}
 
         {/* Profile Card & Logout Button */}
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
-          <div className="flex items-center gap-2.5 p-1 px-3 rounded-2xl bg-slate-50 border border-slate-200">
+        <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200">
+          <div className="flex items-center gap-2 p-1 px-2.5 rounded-xl bg-slate-50 border border-slate-200">
             <img
               src={currentUser.avatarUrl}
               alt={currentUser.name}
-              className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-2xs"
+              className="w-6 h-6 rounded-full object-cover border border-slate-200"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
               }}
             />
-            <div className="text-left">
+            <div className="text-left hidden sm:block">
               <div className="text-xs font-bold text-slate-900 leading-tight">
                 {currentUser.name}
               </div>
-              <div className="text-[10px] text-indigo-600 font-bold font-mono">
+              <div className="text-[10px] text-indigo-600 font-semibold font-mono">
                 {currentUser.role}
               </div>
             </div>
@@ -131,7 +174,7 @@ export function Navbar({ onOpenCreateTask }: NavbarProps) {
             title="Keluar dari akun saat ini"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Keluar</span>
+            <span className="hidden sm:inline">Keluar</span>
           </button>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTaskContext } from '@/lib/store/task-store';
-import { Users2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Users2, AlertTriangle } from 'lucide-react';
 
 export default function WorkloadPage() {
   const { getWorkloadData, setSelectedTaskId } = useTaskContext();

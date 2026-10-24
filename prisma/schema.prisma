@@ -13,6 +13,7 @@ enum Role {
   ADMIN
   MEMBER
   VIEWER
+  MILT
 }
 
 enum Priority {
@@ -35,11 +36,16 @@ model User {
   id                    String            @id @default(uuid())
   email                 String            @unique
   name                  String
+  passwordHash          String?
+  emailVerified         DateTime?
   avatarUrl             String?
+  role                  Role              @default(MEMBER)
   weeklyCapacityHours   Float             @default(40.0)
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
+  accounts              Account[]
+  sessions              Session[]
   memberships           WorkspaceMember[]
   assignedTasks         Task[]            @relation("TaskAssignee")
   createdTasks          Task[]            @relation("TaskCreator")
@@ -50,6 +56,9 @@ model User {
   activities            ActivityLog[]
   notificationsReceived Notification[]    @relation("UserNotifications")
   notificationsTriggered Notification[]   @relation("ActorNotifications")
+  personalTodos         PersonalTodo[]
+  personalNotes         PersonalNote[]
+  savedSheetLinks       SavedSheetLink[]
 
   @@map("users")
 }
@@ -182,6 +191,7 @@ model TimeLog {
   id              String    @id @default(uuid())
   taskId          String
   userId          String
+  durationMinutes Int       @default(0)
   durationSeconds Int       @default(0)
   startedAt       DateTime?
   endedAt         DateTime?
@@ -258,4 +268,97 @@ model Notification {
   actor     User?    @relation("ActorNotifications", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@map("notifications")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+model PersonalTodo {
+  id              String    @id @default(uuid())
+  userId          String
+  title           String
+  description     String?
+  targetDate      DateTime
+  startTime       String?
+  endTime         String?
+  isCompleted     Boolean   @default(false)
+  priority        Priority  @default(MEDIUM)
+  category        String    @default("Kerja")
+  reminderAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, targetDate])
+  @@map("personal_todos")
+}
+
+model PersonalNote {
+  id              String    @id @default(uuid())
+  userId          String
+  title           String
+  contentMarkdown String    @default("")
+  linkedDate      DateTime?
+  tags            String[]  @default([])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, linkedDate])
+  @@map("personal_notes")
+}
+
+model SavedSheetLink {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  url       String
+  category  String   @default("Spreadsheet")
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_sheet_links")
 }

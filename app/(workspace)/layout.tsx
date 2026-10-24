@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTaskContext } from '@/lib/store/task-store';
 import { Sidebar } from '@/app/components/Sidebar';
 import { Navbar } from '@/app/components/Navbar';
@@ -10,14 +10,29 @@ import { CreateTaskModal } from '@/app/components/CreateTaskModal';
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { currentUser, selectedTaskId, setSelectedTaskId } = useTaskContext();
   const [isCreateTaskOpen, setIsCreateTaskOpen] = React.useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
 
   useEffect(() => {
     if (!currentUser) {
       router.push('/login');
+      return;
     }
-  }, [currentUser, router]);
+
+    // Role MILT: strictly isolated to /milt/*
+    if (currentUser.role === 'MILT') {
+      if (!pathname.startsWith('/milt')) {
+        router.push('/milt/todos');
+      }
+    } else {
+      // Other roles: cannot access /milt/*
+      if (pathname.startsWith('/milt')) {
+        router.push('/my-tasks');
+      }
+    }
+  }, [currentUser, pathname, router]);
 
   if (!currentUser) {
     return (
@@ -29,13 +44,19 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
-      {/* Sidebar */}
-      <Sidebar />
+      {/* Sidebar with Mobile Drawer */}
+      <Sidebar
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <Navbar onOpenCreateTask={() => setIsCreateTaskOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <Navbar
+          onOpenCreateTask={() => setIsCreateTaskOpen(true)}
+          onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+        />
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
       </div>
 
       {/* Modals */}

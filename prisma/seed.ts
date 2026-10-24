@@ -1,17 +1,20 @@
 import { PrismaClient, Role, Priority, ActionType } from '@prisma/client';
+import { hashSync } from 'bcrypt-ts';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding demo data for task management system...');
+  const defaultPasswordHash = hashSync('password123', 10);
 
   // 1. Create Demo Users
   const userBudi = await prisma.user.upsert({
     where: { email: 'budi@company.com' },
-    update: {},
+    update: { passwordHash: defaultPasswordHash },
     create: {
       name: 'Budi Santoso',
       email: 'budi@company.com',
+      passwordHash: defaultPasswordHash,
       avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
       weeklyCapacityHours: 40.0,
     },
@@ -19,26 +22,39 @@ async function main() {
 
   const userSiti = await prisma.user.upsert({
     where: { email: 'siti@company.com' },
-    update: {},
+    update: { passwordHash: defaultPasswordHash },
     create: {
       name: 'Siti Rahma',
       email: 'siti@company.com',
+      passwordHash: defaultPasswordHash,
       avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
       weeklyCapacityHours: 35.0,
     },
   });
-
   const userAndi = await prisma.user.upsert({
     where: { email: 'andi@company.com' },
-    update: {},
+    update: { passwordHash: defaultPasswordHash },
     create: {
       name: 'Andi Pratama',
       email: 'andi@company.com',
+      passwordHash: defaultPasswordHash,
       avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
       weeklyCapacityHours: 40.0,
     },
   });
 
+  const userMilt = await prisma.user.upsert({
+    where: { email: 'milt1058@gmail.com' },
+    update: { passwordHash: defaultPasswordHash, role: Role.MILT },
+    create: {
+      name: 'MILT Executive',
+      email: 'milt1058@gmail.com',
+      passwordHash: defaultPasswordHash,
+      role: Role.MILT,
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      weeklyCapacityHours: 40.0,
+    },
+  });
   // 2. Create Workspace
   const workspace = await prisma.workspace.upsert({
     where: { slug: 'acme-product-team' },
@@ -48,6 +64,7 @@ async function main() {
       slug: 'acme-product-team',
       members: {
         create: [
+          { userId: userMilt.id, role: Role.MILT },
           { userId: userBudi.id, role: Role.OWNER },
           { userId: userSiti.id, role: Role.ADMIN },
           { userId: userAndi.id, role: Role.MEMBER },
@@ -75,7 +92,7 @@ async function main() {
   const statusInProgress = await prisma.customStatus.create({
     data: { projectId: project.id, name: 'In Progress', orderIndex: 1, color: '#3B82F6', isDoneState: false },
   });
-  const statusInReview = await prisma.customStatus.create({
+  await prisma.customStatus.create({
     data: { projectId: project.id, name: 'In Review', orderIndex: 2, color: '#F59E0B', isDoneState: false },
   });
   const statusApproved = await prisma.customStatus.create({

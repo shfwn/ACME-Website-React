@@ -12,8 +12,10 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
-export default function ProjectKanbanPage() {
+export default function ProjectKanbanPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
   const { project, tasks, getProjectProgress, setSelectedTaskId } = useTaskContext();
+  const activeProjectId = resolvedParams.id || project.id;
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<string>('ALL');
@@ -23,6 +25,7 @@ export default function ProjectKanbanPage() {
 
   // Filter tasks for this project
   const projectTasks = tasks.filter(t => {
+    if (t.projectId !== activeProjectId && activeProjectId !== 'proj-mobile') return false;
     const matchesSearch =
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||

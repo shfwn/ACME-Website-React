@@ -1,6 +1,5 @@
 'use client';
 
-import type { Metadata } from 'next';
 import { TaskProvider } from '@/lib/store/task-store';
 import './globals.css';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTaskContext, Task, User } from '@/lib/store/task-store';
+import { useTaskContext, Priority } from '@/lib/store/task-store';
 import {
   X,
   CheckCircle2,
@@ -12,7 +12,6 @@ import {
   Send,
   Target,
   ShieldAlert,
-  ListTodo,
   Lock,
 } from 'lucide-react';
 import { calculateProgress } from '@/lib/utils/progress';
@@ -57,7 +56,6 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   // Hak edit khusus pembuat tugas (creator) atau Owner
   const isCreator = task.creatorId === currentUser.id || currentUser.role === 'OWNER';
 
-  const currentStatus = project.statuses.find(s => s.id === task.statusId);
   const assignee = users.find(u => u.id === task.assigneeId);
   const creator = users.find(u => u.id === task.creatorId);
   const totalSubtasks = task.subtasks?.length || 0;
@@ -123,7 +121,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
             {isCreator ? (
               <select
                 value={task.priority}
-                onChange={e => updateTask(task.id, { priority: e.target.value as any })}
+                onChange={e => updateTask(task.id, { priority: e.target.value as Priority })}
                 className="text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 cursor-pointer shadow-2xs"
               >
                 <option value="LOW">Prioritas: Biasa</option>

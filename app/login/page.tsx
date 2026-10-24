@@ -1,42 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useActionState } from 'react';
+import { LogIn, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { loginAction } from '@/app/actions/auth.actions';
 import { useTaskContext } from '@/lib/store/task-store';
-import { LogIn, Lock, Mail, ShieldCheck, UserCheck } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login, currentUser } = useTaskContext();
-  const [emailInput, setEmailInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useTaskContext();
+  const [state, formAction, isPending] = useActionState(loginAction, undefined);
 
-  useEffect(() => {
-    if (currentUser) {
-      router.push('/my-tasks');
+  const handleSubmit = (formData: FormData) => {
+    const email = formData.get('email');
+    if (typeof email === 'string') {
+      login(email);
     }
-  }, [currentUser, router]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (!emailInput.trim()) {
-      setErrorMsg('Silakan masukkan alamat email Anda.');
-      return;
-    }
-
-    setIsLoading(true);
-    const success = login(emailInput.trim());
-
-    if (success) {
-      router.push('/my-tasks');
-    } else {
-      setIsLoading(false);
-      setErrorMsg('Email tidak ditemukan dalam sistem. Gunakan email akun Owner yang telah disediakan atau hubungi Owner.');
-    }
+    formAction(formData);
   };
 
   return (
@@ -91,7 +69,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form action={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">Alamat Email</label>
@@ -99,10 +77,9 @@ export default function LoginPage() {
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
+                  name="email"
                   required
-                  value={emailInput}
-                  onChange={e => setEmailInput(e.target.value)}
-                  placeholder="owner@company.com"
+                  placeholder="budi@company.com"
                   className="w-full text-xs pl-10 pr-3.5 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium"
                 />
               </div>
@@ -117,28 +94,28 @@ export default function LoginPage() {
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="password"
-                  value={passwordInput}
-                  onChange={e => setPasswordInput(e.target.value)}
+                  name="password"
+                  required
                   placeholder="••••••••"
                   className="w-full text-xs pl-10 pr-3.5 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium"
                 />
               </div>
             </div>
 
-            {errorMsg && (
+            {state?.error && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-700 font-medium leading-relaxed">
-                {errorMsg}
+                {state.error}
               </div>
             )}
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isPending}
               className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
             >
               <LogIn className="w-4 h-4" />
-              <span>{isLoading ? 'Memproses Masuk...' : 'Masuk ke Workspace'}</span>
+              <span>{isPending ? 'Memproses Masuk...' : 'Masuk ke Workspace'}</span>
             </button>
           </form>
         </div>
