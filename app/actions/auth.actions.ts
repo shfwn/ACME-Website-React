@@ -20,8 +20,8 @@ export async function loginAction(
 
   try {
     const cleanEmail = email.trim().toLowerCase();
-    const isMilt = cleanEmail === 'milt1058@gmail.com' || cleanEmail === 'milt@company.com';
-    const destination = isMilt ? '/milt/todos' : '/my-tasks';
+    const isOwner = cleanEmail === 'milt1058@gmail.com' || cleanEmail === 'owner@company.com';
+    const destination = isOwner ? '/milt/todos' : '/my-tasks';
 
     await signIn('credentials', {
       email: cleanEmail,

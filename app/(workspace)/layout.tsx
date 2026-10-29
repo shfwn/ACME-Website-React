@@ -21,9 +21,9 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    // Role MILT: strictly isolated to /milt/*
-    if (currentUser.role === 'MILT') {
-      if (!pathname.startsWith('/milt')) {
+    // Role OWNER (milt1058@gmail.com): strictly isolated to /milt/* and /settings
+    if (currentUser.role === 'OWNER') {
+      if (!pathname.startsWith('/milt') && !pathname.startsWith('/settings')) {
         router.push('/milt/todos');
       }
     } else {

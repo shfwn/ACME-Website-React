@@ -44,10 +44,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Standard test accounts with hashed passwords
         const defaultHash = '$2b$10$vyfPJFIoyWcL390Vr3sm.e4Uw2vd.6bNHBLhkwcoxCG6z6kPwFQrO'; // password123
-        const localTestAccounts: Record<string, { id: string; name: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' | 'MILT' }> = {
-          'milt1058@gmail.com': { id: 'u-milt', name: 'MILT Executive', role: 'MILT' },
-          'budi@company.com': { id: 'u-budi', name: 'Budi Santoso', role: 'OWNER' },
-          'owner@company.com': { id: 'u-budi', name: 'Budi Santoso', role: 'OWNER' },
+        const localTestAccounts: Record<string, { id: string; name: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' }> = {
+          'milt1058@gmail.com': { id: 'u-milt', name: 'Owner', role: 'OWNER' },
+          'owner@company.com': { id: 'u-milt', name: 'Owner', role: 'OWNER' },
           'siti@company.com': { id: 'u-siti', name: 'Siti Rahma', role: 'ADMIN' },
           'andi@company.com': { id: 'u-andi', name: 'Andi Pratama', role: 'MEMBER' },
         };

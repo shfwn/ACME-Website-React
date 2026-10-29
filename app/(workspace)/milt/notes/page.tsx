@@ -1,19 +1,33 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useTaskContext, PersonalNote } from '@/lib/store/task-store';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTaskContext, PersonalNote, PersonalTodoColor } from '@/lib/store/task-store';
 import {
   Plus,
-  Save,
+  ArrowLeft,
   Trash2,
+  Save,
+  Image as ImageIcon,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Search,
+  CheckCircle2,
+  FileText,
+  Clock,
+  X,
+  Maximize2,
   Calendar as CalendarIcon,
-  Tag,
-  ArrowRight,
-  ListTodo,
+  CheckSquare,
+  Sparkles,
 } from 'lucide-react';
-
-export default function PersonalNotesPage() {
+export default function NotesPage() {
   const {
     currentUser,
     personalNotes,
@@ -23,373 +37,778 @@ export default function PersonalNotesPage() {
   } = useTaskContext();
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const [selectedNoteId, setSelectedNoteId] = useState<string>(personalNotes[0]?.id || '');
-  const [isEditing, setIsEditing] = useState(false);
 
-  const activeNote = personalNotes.find(n => n.id === selectedNoteId) || personalNotes[0];
+  // Mode: 'list' (semua catatan) or 'editor' (tulis/edit)
+  const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
-  const [title, setTitle] = useState(activeNote?.title || '');
-  const [contentMarkdown, setContentMarkdown] = useState(activeNote?.contentMarkdown || '');
-  const [linkedDate, setLinkedDate] = useState<string>(activeNote?.linkedDate || todayStr);
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>(activeNote?.tags || ['Pribadi']);
+  // Editor states
+  const [title, setTitle] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
+  const [linkedDate, setLinkedDate] = useState<string>(todayStr);
+  const [images, setImages] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTabFilter, setActiveTabFilter] = useState<'ALL' | 'DAILY' | 'PHOTOS'>('ALL');
+  const [isSaving, setIsSaving] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
-  if (!currentUser) return null;
+  // Note-to-Todo Converter states
+  const [showTodoConverter, setShowTodoConverter] = useState(false);
+  const [todoTitleInput, setTodoTitleInput] = useState('');
+  const [todoTimeInput, setTodoTimeInput] = useState('09:00');
+  const [todoColorInput, setTodoColorInput] = useState<PersonalTodoColor>('yellow');
+  const [todoCreatedSuccess, setTodoCreatedSuccess] = useState(false);
 
-  const handleSelectNote = (note: PersonalNote) => {
-    setSelectedNoteId(note.id);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Open existing note for editing
+  const handleOpenNote = (note: PersonalNote) => {
+    setActiveNoteId(note.id);
     setTitle(note.title);
-    setContentMarkdown(note.contentMarkdown);
+    setContentHtml(note.contentMarkdown || '');
     setLinkedDate(note.linkedDate || todayStr);
-    setTags(note.tags || ['Pribadi']);
-    setIsEditing(false);
+    setImages(note.images || []);
+    setViewMode('editor');
   };
 
-  const handleCreateNote = () => {
+  // Create new note
+  const handleCreateNewNote = (forDate?: string) => {
+    const targetDate = forDate || todayStr;
+    const todayFormatted = new Date(targetDate + 'T00:00:00').toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const defaultTitle = `Catatan Harian — ${todayFormatted}`;
+    const defaultHtml = `<p>Tulis rangkuman harian, evaluasi meeting, atau poin penting di sini...</p>`;
+
     const newNote = savePersonalNote({
-      title: 'Catatan Rapat ' + new Date().toLocaleDateString('id-ID'),
-      contentMarkdown: `### Agenda Pertemuan & Catatan\n- [ ] Action item 1\n- [ ] Action item 2\n\n> Tulis hasil diskusi atau keputusan penting di sini...`,
-      linkedDate: todayStr,
-      tags: ['Briefing', 'Eksekutif'],
+      title: defaultTitle,
+      contentMarkdown: defaultHtml,
+      linkedDate: targetDate,
+      images: [],
     });
 
     if (newNote) {
-      setSelectedNoteId(newNote.id);
+      setActiveNoteId(newNote.id);
       setTitle(newNote.title);
-      setContentMarkdown(newNote.contentMarkdown);
-      setLinkedDate(newNote.linkedDate || todayStr);
-      setTags(newNote.tags);
-      setIsEditing(true);
+      setContentHtml(newNote.contentMarkdown);
+      setLinkedDate(targetDate);
+      setImages([]);
+      setViewMode('editor');
     }
   };
 
-  const handleSave = () => {
-    if (!activeNote) return;
-    savePersonalNote({
-      id: activeNote.id,
-      title: title.trim() || 'Tanpa Judul',
-      contentMarkdown,
-      linkedDate,
-      tags,
-    });
-    setIsEditing(false);
+  // Sanitize HTML to prevent stored XSS
+  const sanitizeHtml = (raw: string): string => {
+    return raw
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/javascript\s*:[^"']*/gi, '');
   };
 
-  const handleDelete = () => {
-    if (!activeNote) return;
-    deletePersonalNote(activeNote.id);
-    const remaining = personalNotes.filter(n => n.id !== activeNote.id);
-    if (remaining.length > 0) {
-      handleSelectNote(remaining[0]);
-    } else {
-      setSelectedNoteId('');
-    }
-    setIsEditing(false);
-  };
+  // Cleanup timer on switch or unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(autoSaveTimerRef.current!);
+    };
+  }, [activeNoteId]);
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
+  // Sync editor HTML into contentEditable on open
+  useEffect(() => {
+    if (viewMode === 'editor' && editorRef.current) {
+      const safe = sanitizeHtml(contentHtml);
+      if (editorRef.current.innerHTML !== safe) {
+        editorRef.current.innerHTML = safe;
       }
-      setTagInput('');
     }
-  };
+  }, [viewMode, activeNoteId, contentHtml]);
 
-  const handleRemoveTag = (tToRemove: string) => {
-    setTags(tags.filter(t => t !== tToRemove));
-  };
-
-  // Convert note bullet points or checklists directly into personal to-do items
-  const handleExtractTodos = () => {
-    if (!contentMarkdown) return;
-    const lines = contentMarkdown.split('\n');
-    let addedCount = 0;
-
-    lines.forEach(line => {
-      const trimmed = line.trim();
-      let extractedTitle = '';
-
-      if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
-        extractedTitle = trimmed.replace(/- \[[ x]\]\s*/i, '').trim();
-      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        extractedTitle = trimmed.substring(2).trim();
-      }
-
-      if (extractedTitle && extractedTitle.length > 2) {
-        addPersonalTodo({
-          title: extractedTitle,
-          targetDate: linkedDate || todayStr,
-          isCompleted: false,
-          priority: 'MEDIUM',
-          category: 'Kerja',
+  // Debounced auto-save function
+  const triggerAutoSave = useCallback(
+    (updatedTitle: string, updatedHtml: string, updatedImages: string[], updatedDate: string) => {
+      if (!activeNoteId) return;
+      setIsSaving(true);
+      clearTimeout(autoSaveTimerRef.current!);
+      autoSaveTimerRef.current = setTimeout(() => {
+        savePersonalNote({
+          id: activeNoteId,
+          title: updatedTitle.trim() || 'Tanpa Judul',
+          contentMarkdown: sanitizeHtml(updatedHtml),
+          linkedDate: updatedDate,
+          images: updatedImages,
         });
-        addedCount++;
-      }
-    });
+        setIsSaving(false);
+      }, 800);
+    },
+    [activeNoteId, savePersonalNote]
+  );
 
-    if (addedCount > 0) {
-      alert(`${addedCount} to-do berhasil diekstrak dan disematkan ke tanggal ${linkedDate}!`);
-    } else {
-      alert('Tidak ditemukan baris checklist (- [ ]) atau bullet list (- ) pada catatan ini.');
+  // Handle title changes with auto-save
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    triggerAutoSave(newTitle, contentHtml, images, linkedDate);
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setLinkedDate(newDate);
+    triggerAutoSave(title, contentHtml, images, newDate);
+  };
+
+  // Handle content changes in contentEditable
+  const handleEditorInput = () => {
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      setContentHtml(html);
+      triggerAutoSave(title, html, images, linkedDate);
     }
   };
+
+  // Manual save
+  const handleManualSave = () => {
+    if (!activeNoteId) return;
+    clearTimeout(autoSaveTimerRef.current!);
+    savePersonalNote({
+      id: activeNoteId,
+      title: title.trim() || 'Tanpa Judul',
+      contentMarkdown: contentHtml,
+      linkedDate,
+      images,
+    });
+    setIsSaving(false);
+  };
+
+  // Delete note
+  const handleDeleteNote = (noteId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (window.confirm('Hapus catatan ini secara permanen?')) {
+      deletePersonalNote(noteId);
+      if (activeNoteId === noteId) {
+        setViewMode('list');
+        setActiveNoteId(null);
+      }
+    }
+  };
+
+  // Convert snippet / task from note to To-Do List
+  const handleConvertToTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!todoTitleInput.trim()) return;
+
+    addPersonalTodo({
+      title: todoTitleInput.trim(),
+      description: `Berasal dari catatan: "${title}"`,
+      targetDate: linkedDate || todayStr,
+      startTime: todoTimeInput || undefined,
+      colorTheme: todoColorInput,
+      priority: 'MEDIUM',
+      category: 'Kerja',
+      isCompleted: false,
+    });
+
+    setTodoTitleInput('');
+    setTodoCreatedSuccess(true);
+    setTimeout(() => {
+      setTodoCreatedSuccess(false);
+      setShowTodoConverter(false);
+    }, 1800);
+  };
+
+  // Rich text command helper
+  const execCmd = (command: string, value: string | undefined = undefined) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    document.execCommand(command, false, value);
+    handleEditorInput();
+  };
+
+  // Handle image upload and store as base64
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert('Ukuran foto terlalu besar. Maksimal 2.5 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      if (ev.target?.result) {
+        const base64 = ev.target.result as string;
+        const updatedImages = [...images, base64];
+        setImages(updatedImages);
+        triggerAutoSave(title, contentHtml, updatedImages, linkedDate);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = (idx: number) => {
+    const updated = images.filter((_, i) => i !== idx);
+    setImages(updated);
+    triggerAutoSave(title, contentHtml, updated, linkedDate);
+  };
+
+  if (!currentUser) return null;
+
+  // Filter notes
+  const filteredNotes = personalNotes.filter(n => {
+    const matchesSearch =
+      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      n.contentMarkdown.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (activeTabFilter === 'DAILY') {
+      return !!n.linkedDate;
+    }
+    if (activeTabFilter === 'PHOTOS') {
+      return (n.images || []).length > 0;
+    }
+    return true;
+  });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in pb-12">
-      {/* Header */}
-      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-6xl mx-auto space-y-5 animate-in fade-in pb-16">
+      {/* 1. Header Banner */}
+      <div className="bg-white p-5 sm:p-6 rounded-[28px] border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900">
-            Catatan
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Dokumentasi dan catatan harian terhubung tanggal.
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#6C7EC2]" />
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+              Pencatatan & Jurnal Harian
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Dokumentasikan evaluasi harian, meeting, rangkuman, dan hubungkan langsung ke To-Do List.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleCreateNote}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Catatan Baru</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Grid: Sidebar Notes List + Editor / Reader */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Notes List (4 Cols) */}
-        <div className="lg:col-span-4 bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              Semua Catatan ({personalNotes.length})
-            </span>
-          </div>
-
-          <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
-            {personalNotes.length === 0 ? (
-              <p className="text-xs text-slate-400 italic p-4 text-center">Belum ada catatan.</p>
-            ) : (
-              personalNotes.map(n => {
-                const isSelected = activeNote?.id === n.id;
-
-                return (
-                  <div
-                    key={n.id}
-                    onClick={() => handleSelectNote(n)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
-                      isSelected
-                        ? 'bg-indigo-50/80 border-indigo-300 ring-1 ring-indigo-400/30'
-                        : 'bg-slate-50/60 hover:bg-white border-slate-200/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-extrabold text-slate-900 truncate flex-1">
-                        {n.title}
-                      </h3>
-                      {n.linkedDate && (
-                        <span className="text-[10px] font-mono font-bold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-100 shrink-0 ml-2">
-                          {n.linkedDate}
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                      {n.contentMarkdown.replace(/[#*`>-]/g, '')}
-                    </p>
-
-                    {n.tags && n.tags.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                        {n.tags.map(t => (
-                          <span
-                            key={t}
-                            className="text-[9px] font-semibold bg-white text-slate-600 px-1.5 py-0.5 rounded border border-slate-200"
-                          >
-                            #{t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Note Content Viewer & Editor (8 Cols) */}
-        <div className="lg:col-span-8 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs space-y-5">
-          {activeNote ? (
-            <>
-              {/* Note Header & Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                <div className="flex-1 space-y-1">
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder="Judul Catatan..."
-                      className="w-full text-base sm:text-lg font-extrabold text-slate-900 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                    />
-                  ) : (
-                    <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                      {activeNote.title}
-                    </h2>
-                  )}
-
-                  {/* Linked Date & Tag Info */}
-                  <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 font-medium">
-                    <span className="flex items-center gap-1 text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      <span>{linkedDate || 'Tidak terikat'}</span>
-                    </span>
-
-                    {/* Quick Link to Calendar */}
-                    {linkedDate && (
-                      <Link
-                        href="/milt/calendar"
-                        className="text-[11px] text-slate-400 hover:text-indigo-600 flex items-center gap-1"
-                      >
-                        <span>Lihat di Kalender</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </Link>
-                    )}
-                  </div>
-                </div>
-
-                {/* Top Action Buttons */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {isEditing ? (
-                    <button
-                      onClick={handleSave}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Simpan</span>
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setTitle(activeNote.title);
-                          setContentMarkdown(activeNote.contentMarkdown);
-                          setLinkedDate(activeNote.linkedDate || todayStr);
-                          setTags(activeNote.tags || []);
-                          setIsEditing(true);
-                        }}
-                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        Edit Catatan
-                      </button>
-
-                      <button
-                        onClick={handleExtractTodos}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-200 cursor-pointer"
-                        title="Ekstrak baris checklist (- [ ]) menjadi agenda to-do kalender"
-                      >
-                        <ListTodo className="w-4 h-4 text-indigo-600" />
-                        <span className="hidden sm:inline">Ekstrak To-Do</span>
-                      </button>
-
-                      <button
-                        onClick={handleDelete}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                        title="Hapus Catatan"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Linked Date Editor when in Edit Mode */}
-              {isEditing && (
-                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-600 flex items-center gap-1">
-                      <CalendarIcon className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Tautkan ke Tanggal Kalender:</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={linkedDate}
-                      onChange={e => setLinkedDate(e.target.value)}
-                      className="w-full p-2 bg-white rounded-xl border border-slate-200 font-semibold text-slate-800"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-600 flex items-center gap-1">
-                      <Tag className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Tagar Kategori (Tekan Enter):</span>
-                    </label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={tagInput}
-                        onChange={e => setTagInput(e.target.value)}
-                        onKeyDown={handleAddTag}
-                        placeholder="Ketik tagar lalu Enter..."
-                        className="w-full p-2 bg-white rounded-xl border border-slate-200 text-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  {tags.length > 0 && (
-                    <div className="sm:col-span-2 flex items-center gap-1.5 flex-wrap pt-1">
-                      {tags.map(t => (
-                        <span
-                          key={t}
-                          className="bg-indigo-50 text-indigo-800 text-[11px] font-bold px-2 py-0.5 rounded-md border border-indigo-200 flex items-center gap-1"
-                        >
-                          <span>#{t}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTag(t)}
-                            className="text-indigo-400 hover:text-rose-600 ml-1 cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Markdown Editor or Clean Reader */}
-              {isEditing ? (
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Isi Catatan Markdown (Mendukung Checklist - [ ])
-                  </label>
-                  <textarea
-                    rows={16}
-                    value={contentMarkdown}
-                    onChange={e => setContentMarkdown(e.target.value)}
-                    placeholder="Tulis catatan eksekutif Anda di sini..."
-                    className="w-full text-xs font-mono p-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 leading-relaxed resize-y"
-                  />
-                </div>
-              ) : (
-                <div className="prose max-w-none text-xs leading-relaxed space-y-3 whitespace-pre-wrap font-sans text-slate-700 bg-slate-50/60 p-5 sm:p-6 rounded-2xl border border-slate-100 min-h-[300px]">
-                  {activeNote.contentMarkdown}
-                </div>
-              )}
-            </>
+          {viewMode === 'list' ? (
+            <button
+              onClick={() => handleCreateNewNote()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Buat Catatan Baru</span>
+            </button>
           ) : (
-            <div className="text-center p-12 text-slate-400 text-xs">
-              Pilih catatan di sebelah kiri atau klik &ldquo;Buat Catatan Baru&rdquo;.
-            </div>
+            <button
+              onClick={() => setViewMode('list')}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Daftar</span>
+            </button>
           )}
         </div>
       </div>
+
+      {/* 2. MODE LIST: Grid Semua Catatan */}
+      {viewMode === 'list' && (
+        <div className="space-y-5">
+          {/* Filter Tabs & Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200">
+              <button
+                onClick={() => setActiveTabFilter('ALL')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTabFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Semua ({personalNotes.length})
+              </button>
+              <button
+                onClick={() => setActiveTabFilter('DAILY')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTabFilter === 'DAILY'
+                    ? 'bg-white text-[#6C7EC2] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Jurnal Harian ({personalNotes.filter(n => n.linkedDate).length})
+              </button>
+              <button
+                onClick={() => setActiveTabFilter('PHOTOS')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTabFilter === 'PHOTOS'
+                    ? 'bg-white text-emerald-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Berlampiran Foto ({personalNotes.filter(n => (n.images || []).length > 0).length})
+              </button>
+            </div>
+
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Cari judul atau isi catatan..."
+                className="w-full text-xs pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-[#6C7EC2] focus:outline-hidden"
+              />
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          {filteredNotes.length === 0 ? (
+            <div className="bg-white p-16 text-center rounded-[28px] border border-slate-200/80 space-y-3">
+              <FileText className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-800">Belum ada catatan ditemukan</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                Tulis rangkuman harian atau catatan meeting baru untuk mulai mendokumentasikan aktivitas Anda.
+              </p>
+              <button
+                onClick={() => handleCreateNewNote()}
+                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-[#6C7EC2] hover:bg-indigo-100 rounded-xl text-xs font-bold border border-indigo-200 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Mulai Menulis</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredNotes.map(note => {
+                const cleanPreview = note.contentMarkdown
+                  .replace(/<[^>]*>?/gm, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                const hasPhotos = note.images && note.images.length > 0;
+                const formattedDate = new Date(note.updatedAt).toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                });
+
+                return (
+                  <div
+                    key={note.id}
+                    onClick={() => handleOpenNote(note)}
+                    className="group bg-white rounded-[24px] p-5 border border-slate-200/90 hover:border-[#6C7EC2] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-3 relative"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h2 className="text-sm font-extrabold text-slate-900 group-hover:text-[#6C7EC2] transition-colors line-clamp-1 flex-1">
+                          {note.title}
+                        </h2>
+                        <button
+                          onClick={e => handleDeleteNote(note.id, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer shrink-0"
+                          title="Hapus catatan"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Linked Date Tag if set */}
+                      {note.linkedDate && (
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#243575] bg-[#F0F3FE] border border-[#C5D0FB] px-2.5 py-0.5 rounded-lg w-fit">
+                          <CalendarIcon className="w-3 h-3 text-[#6C7EC2]" />
+                          <span>Tertaut: {note.linkedDate}</span>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed font-normal">
+                        {cleanPreview || 'Catatan kosong...'}
+                      </p>
+
+                      {hasPhotos && (
+                        <div className="flex items-center gap-1.5 pt-1 overflow-hidden">
+                          {note.images?.slice(0, 3).map((img, i) => (
+                            <img
+                              key={i}
+                              src={img}
+                              alt="Lampiran"
+                              className="w-12 h-12 object-cover rounded-xl border border-slate-200 shrink-0"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{formattedDate}</span>
+                      </span>
+                      {hasPhotos && (
+                        <span className="flex items-center gap-1 text-[#6C7EC2] font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{note.images?.length} Foto</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. MODE EDITOR DOKUMEN & INTEGRASI TO-DO */}
+      {viewMode === 'editor' && (
+        <div className="space-y-4">
+          {/* Top Status & Date Linking Bar */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-[24px] border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setViewMode('list')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Daftar</span>
+              </button>
+
+              {/* Linked Date Picker */}
+              <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+                <CalendarIcon className="w-3.5 h-3.5 text-[#6C7EC2]" />
+                <span className="text-[11px] font-bold text-slate-500">Tautkan Tanggal:</span>
+                <input
+                  type="date"
+                  value={linkedDate}
+                  onChange={e => e.target.value && handleDateChange(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Auto-save status & Actions */}
+            <div className="flex items-center gap-2">
+              <div className="text-xs mr-1">
+                {isSaving ? (
+                  <span className="text-amber-600 font-semibold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Menyimpan...</span>
+                  </span>
+                ) : (
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Tersimpan</span>
+                  </span>
+                )}
+              </div>
+
+              {/* 1-Click Convert to To-Do Button */}
+              <button
+                onClick={() => setShowTodoConverter(!showTodoConverter)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFE28A] hover:bg-[#FCD86C] text-[#634800] rounded-xl text-xs font-extrabold shadow-2xs cursor-pointer border border-[#F2D16C]"
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>Jadikan To-Do</span>
+              </button>
+
+              <button
+                onClick={handleManualSave}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Simpan</span>
+              </button>
+
+              {activeNoteId && (
+                <button
+                  onClick={() => handleDeleteNote(activeNoteId)}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                  title="Hapus catatan"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Note-to-Todo Conversion Popout Panel */}
+          {showTodoConverter && (
+            <form
+              onSubmit={handleConvertToTodo}
+              className="bg-[#FFFCEB] border border-[#F6D779] p-4 rounded-2xl shadow-xs space-y-3 animate-in fade-in"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[#634800] font-extrabold text-xs">
+                  <Sparkles className="w-4 h-4 text-[#F9C942]" />
+                  <span>Konversi Cepat Baris Catatan Menjadi To-Do Harian</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTodoConverter(false)}
+                  className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {todoCreatedSuccess && (
+                <div className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Berhasil ditambahkan ke daftar To-Do tanggal {linkedDate}!</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-6">
+                  <input
+                    type="text"
+                    required
+                    value={todoTitleInput}
+                    onChange={e => setTodoTitleInput(e.target.value)}
+                    placeholder="Judul to-do baru dari poin catatan ini..."
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-amber-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-[#6C7EC2]"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <input
+                    type="time"
+                    value={todoTimeInput}
+                    onChange={e => setTodoTimeInput(e.target.value)}
+                    className="w-full text-xs px-2.5 py-2 rounded-xl border border-amber-300 bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <select
+                    value={todoColorInput}
+                    onChange={e => setTodoColorInput(e.target.value as PersonalTodoColor)}
+                    className="w-full text-xs px-2 py-2 rounded-xl border border-amber-300 bg-white font-bold"
+                  >
+                    <option value="yellow">Kuning (Fokus)</option>
+                    <option value="pink">Pink (Personal)</option>
+                    <option value="mint">Mint (Project)</option>
+                    <option value="periwinkle">Periwinkle (Utama)</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="w-full h-full py-2 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-extrabold cursor-pointer"
+                  >
+                    Buat To-Do
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* Formatting Toolbar */}
+          <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-1.5 text-xs text-slate-700 select-none">
+            {/* Font Family */}
+            <select
+              onChange={e => execCmd('fontName', e.target.value)}
+              className="p-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+              defaultValue="sans-serif"
+            >
+              <option value="sans-serif">Modern Sans</option>
+              <option value="serif">Times Serif</option>
+              <option value="monospace">Code Monospace</option>
+            </select>
+
+            {/* Font Size */}
+            <select
+              onChange={e => execCmd('fontSize', e.target.value)}
+              className="p-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+              defaultValue="3"
+            >
+              <option value="2">Kecil (12px)</option>
+              <option value="3">Normal (14px)</option>
+              <option value="4">Sedang (16px)</option>
+              <option value="5">Subjudul / H2</option>
+              <option value="6">Judul Besar / H1</option>
+            </select>
+
+            <div className="w-[1px] h-5 bg-slate-200 mx-1 hidden sm:block" />
+
+            <button
+              onClick={() => execCmd('bold')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 font-bold cursor-pointer"
+              title="Tebal (Bold)"
+            >
+              <Bold className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('italic')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 italic cursor-pointer"
+              title="Miring (Italic)"
+            >
+              <Italic className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('underline')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 underline cursor-pointer"
+              title="Garis Bawah (Underline)"
+            >
+              <Underline className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('strikeThrough')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 line-through cursor-pointer"
+              title="Coretan"
+            >
+              <Strikethrough className="w-4 h-4" />
+            </button>
+
+            <div className="w-[1px] h-5 bg-slate-200 mx-1 hidden sm:block" />
+
+            {/* List */}
+            <button
+              onClick={() => execCmd('insertUnorderedList')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+              title="Bullet Points"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('insertOrderedList')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+              title="Numbered List"
+            >
+              <ListOrdered className="w-4 h-4" />
+            </button>
+
+            <div className="w-[1px] h-5 bg-slate-200 mx-1 hidden sm:block" />
+
+            {/* Alignments */}
+            <button
+              onClick={() => execCmd('justifyLeft')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+            >
+              <AlignLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('justifyCenter')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+            >
+              <AlignCenter className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => execCmd('justifyRight')}
+              className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+            >
+              <AlignRight className="w-4 h-4" />
+            </button>
+
+            <div className="w-[1px] h-5 bg-slate-200 mx-1 hidden sm:block" />
+
+            {/* Upload Photo Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1.5 px-2.5 rounded-lg hover:bg-slate-100 flex items-center gap-1 cursor-pointer text-[#6C7EC2] font-bold"
+              title="Unggah foto dokumen"
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span className="text-[11px]">Sisipkan Foto</span>
+            </button>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Main Document Paper Canvas */}
+          <div className="bg-white rounded-[28px] border border-slate-200/90 shadow-xs p-6 sm:p-10 space-y-5 min-h-[500px]">
+            {/* Title */}
+            <input
+              type="text"
+              value={title}
+              onChange={handleTitleChange}
+              placeholder="Judul Catatan..."
+              className="w-full text-xl sm:text-2xl font-extrabold text-slate-900 placeholder-slate-300 border-0 border-b border-transparent hover:border-slate-200 focus:border-[#6C7EC2] focus:outline-hidden pb-2 transition-colors tracking-tight"
+            />
+
+            {/* Content Body */}
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              data-placeholder="Ketik catatan atau rangkuman Anda di sini..."
+              className="min-h-[350px] text-xs sm:text-sm text-slate-800 leading-relaxed font-sans focus:outline-hidden prose max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+            />
+
+            {/* Images Gallery */}
+            {images.length > 0 && (
+              <div className="pt-6 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-[#6C7EC2]" />
+                    <span>Lampiran Foto ({images.length})</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-video"
+                    >
+                      <img
+                        src={img}
+                        alt={`Lampiran ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setPreviewPhoto(img)}
+                          className="p-1.5 bg-white text-slate-800 rounded-lg hover:scale-110 transition-transform cursor-pointer"
+                          title="Perbesar Foto"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleRemovePhoto(idx)}
+                          className="p-1.5 bg-rose-600 text-white rounded-lg hover:scale-110 transition-transform cursor-pointer"
+                          title="Hapus Foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Photo Modal Preview */}
+      {previewPhoto && (
+        <div
+          onClick={() => setPreviewPhoto(null)}
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl p-2"
+          >
+            <button
+              onClick={() => setPreviewPhoto(null)}
+              className="absolute top-4 right-4 p-2 bg-slate-900/60 text-white hover:bg-slate-900 rounded-full transition-colors cursor-pointer z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewPhoto}
+              alt="Preview Rangkuman"
+              className="max-h-[82vh] w-auto mx-auto rounded-2xl object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

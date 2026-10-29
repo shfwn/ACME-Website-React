@@ -83,6 +83,14 @@ export interface DocWiki {
   updatedAt: string;
 }
 
+export interface PersonalTodoSubtask {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+}
+
+export type PersonalTodoColor = 'yellow' | 'pink' | 'mint' | 'periwinkle';
+
 export interface PersonalTodo {
   id: string;
   userId: string;
@@ -94,6 +102,8 @@ export interface PersonalTodo {
   isCompleted: boolean;
   priority: Priority;
   category: string;   // "Kerja" | "Pribadi" | "Fokus" | "Penting"
+  colorTheme?: PersonalTodoColor;
+  subtasks?: PersonalTodoSubtask[];
   reminderAt?: string;
   createdAt: string;
 }
@@ -105,6 +115,7 @@ export interface PersonalNote {
   contentMarkdown: string;
   linkedDate?: string; // YYYY-MM-DD
   tags: string[];
+  images?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -150,16 +161,8 @@ export interface Project {
 export const INITIAL_USERS: User[] = [
   {
     id: 'u-milt',
-    name: 'MILT Executive',
+    name: 'Owner',
     email: 'milt1058@gmail.com',
-    avatarUrl: '/assets/images/profile/user-1.jpg',
-    role: 'MILT',
-    weeklyCapacityHours: 40,
-  },
-  {
-    id: 'u-budi',
-    name: 'Budi Santoso',
-    email: 'owner@company.com',
     avatarUrl: '/assets/images/profile/user-1.jpg',
     role: 'OWNER',
     weeklyCapacityHours: 40,
@@ -192,23 +195,52 @@ export const INITIAL_PERSONAL_TODOS: PersonalTodo[] = [
     description: 'Pengecekan timeline dan alokasi sumber daya kuartal ini.',
     targetDate: todayIso,
     startTime: '09:00',
-    endTime: '10:30',
+    endTime: '11:00',
     isCompleted: false,
     priority: 'HIGH',
     category: 'Kerja',
+    colorTheme: 'yellow',
+    subtasks: [
+      { id: 'st-1', title: 'Audit dependensi modul milt', isCompleted: true },
+      { id: 'st-2', title: 'Verifikasi integrasi database', isCompleted: false },
+      { id: 'st-3', title: 'Siapkan draft spreadsheet mingguan', isCompleted: false },
+    ],
     createdAt: new Date().toISOString(),
   },
   {
     id: 'pt-2',
     userId: 'u-milt',
-    title: 'Sinkronisasi Spreadsheet Keuangan & Operasional',
-    description: 'Buka Google Sheet master tracker di panel samping.',
+    title: 'Penyusunan Catatan Harian & Logbook Proyek',
+    description: 'Dokumentasikan hasil diskusi rapat pagi dan tindak lanjutnya.',
     targetDate: todayIso,
-    startTime: '13:30',
-    endTime: '15:00',
+    startTime: '13:00',
+    endTime: '14:00',
+    isCompleted: false,
+    priority: 'MEDIUM',
+    category: 'Pribadi',
+    colorTheme: 'pink',
+    subtasks: [
+      { id: 'st-4', title: 'Tulis ringkasan meeting internal', isCompleted: true },
+      { id: 'st-5', title: 'Sematkan tautan dokumen wiki', isCompleted: false },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'pt-3',
+    userId: 'u-milt',
+    title: 'Sinkronisasi Spreadsheet Keuangan & Operasional',
+    description: 'Rekap jadwal mingguan dan konversi data ke spreadsheet.',
+    targetDate: todayIso,
+    startTime: '14:10',
+    endTime: '16:00',
     isCompleted: true,
     priority: 'MEDIUM',
     category: 'Fokus',
+    colorTheme: 'mint',
+    subtasks: [
+      { id: 'st-6', title: 'Ekspor berkas CSV log harian', isCompleted: true },
+      { id: 'st-7', title: 'Cek formula total jam kerja', isCompleted: true },
+    ],
     createdAt: new Date().toISOString(),
   },
 ];
@@ -230,16 +262,7 @@ export const INITIAL_PERSONAL_NOTES: PersonalNote[] = [
   },
 ];
 
-export const INITIAL_SAVED_SHEETS: SavedSheetLink[] = [
-  {
-    id: 'sh-1',
-    userId: 'u-milt',
-    title: 'Master Roadmap & Tracker 2026',
-    url: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing',
-    category: 'Perencanaan',
-    createdAt: new Date().toISOString(),
-  },
-];
+export const INITIAL_SAVED_SHEETS: SavedSheetLink[] = [];
 
 const INITIAL_PROJECT: Project = {
   id: 'proj-mobile',
@@ -344,7 +367,7 @@ Dokumen ini merangkum endpoint API dan spesifikasi design token untuk mobile dev
 ### Standar Token
 - Primary Color: #4F46E5
 - Status Green: #059669
-- API Base URL: https://api.acme.com/v2
+- API Base URL: /api/v2
 
 ### Aturan Estafet Tugas
 1. Desain UI diselesaikan di Figma sebelum frontend koding dimulai.
@@ -404,8 +427,8 @@ interface TaskContextType {
   login: (identifier: string) => boolean;
   logout: () => void;
   // User Management for Owner
-  addUser: (name: string, email: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER', capacity?: number) => { success: boolean; error?: string };
-  updateUserRole: (userId: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER') => void;
+  addUser: (name: string, email: string, role: User['role'], capacity?: number) => { success: boolean; error?: string };
+  updateUserRole: (userId: string, role: User['role']) => void;
   deleteUser: (userId: string) => void;
   // Actions
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -444,11 +467,15 @@ interface TaskContextType {
   togglePersonalTodo: (id: string) => void;
   updatePersonalTodo: (id: string, data: Partial<PersonalTodo>) => void;
   deletePersonalTodo: (id: string) => void;
+  togglePersonalTodoSubtask: (todoId: string, subtaskId: string) => void;
+  addPersonalTodoSubtask: (todoId: string, title: string) => void;
+  deletePersonalTodoSubtask: (todoId: string, subtaskId: string) => void;
   rolloverPendingTodos: (targetDate: string) => number;
   savePersonalNote: (data: Partial<PersonalNote>) => PersonalNote | undefined;
   deletePersonalNote: (id: string) => void;
   saveSheetLink: (title: string, url: string, category?: string) => void;
   deleteSheetLink: (id: string) => void;
+  updateProfile: (data: { name?: string; email?: string; avatarUrl?: string }) => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -591,7 +618,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       u =>
         u.id === identifier ||
         u.email.toLowerCase() === identifier.trim().toLowerCase() ||
-        (identifier.trim().toLowerCase() === 'budi@company.com' && u.id === 'u-budi') ||
+        (identifier.trim().toLowerCase() === 'milt1058@gmail.com' && u.role === 'OWNER') ||
         (identifier.trim().toLowerCase() === 'owner@company.com' && u.role === 'OWNER')
     );
     if (user) {
@@ -608,7 +635,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   };
 
   // User Management Actions (for OWNER)
-  const addUser = (name: string, email: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER', capacity: number = 40) => {
+  const addUser = (name: string, email: string, role: User['role'], capacity: number = 40) => {
     if (!name.trim() || !email.trim()) {
       return { success: false, error: 'Nama dan email wajib diisi.' };
     }
@@ -634,7 +661,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  const updateUserRole = (userId: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER') => {
+  const updateUserRole = (userId: string, role: User['role']) => {
     const updated = users.map(u => (u.id === userId ? { ...u, role } : u));
     setUsers(updated);
     localStorage.setItem('acme_users', JSON.stringify(updated));
@@ -659,6 +686,22 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     );
 
     showToast('Pengguna telah dihapus dari tim.');
+  };
+
+  const updateProfile = (data: { name?: string; email?: string; avatarUrl?: string }) => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      ...currentUser,
+      name: data.name ? data.name.trim() : currentUser.name,
+      email: data.email ? data.email.trim().toLowerCase() : currentUser.email,
+      avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : currentUser.avatarUrl,
+    };
+    setCurrentUser(updatedUser);
+
+    const updatedUsers = users.map(u => (u.id === currentUser.id ? updatedUser : u));
+    setUsers(updatedUsers);
+    localStorage.setItem('acme_users', JSON.stringify(updatedUsers));
+    showToast('Profil akun berhasil diperbarui.');
   };
 
   // Activity privacy filter by role
@@ -1075,6 +1118,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       priority: data.priority || 'MEDIUM',
       category: data.category || 'Kerja',
+      colorTheme: data.colorTheme || 'yellow',
+      subtasks: data.subtasks || [],
       reminderAt: data.reminderAt,
       createdAt: new Date().toISOString(),
     };
@@ -1098,6 +1143,45 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const deletePersonalTodo = (id: string) => {
     updateAndPersistPersonalTodos(prev => prev.filter(t => t.id !== id));
     showToast('Agenda to-do dihapus.');
+  };
+
+  const togglePersonalTodoSubtask = (todoId: string, subtaskId: string) => {
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => {
+        if (t.id !== todoId) return t;
+        const updatedSubtasks = (t.subtasks || []).map(st =>
+          st.id === subtaskId ? { ...st, isCompleted: !st.isCompleted } : st
+        );
+        return { ...t, subtasks: updatedSubtasks };
+      })
+    );
+  };
+
+  const addPersonalTodoSubtask = (todoId: string, title: string) => {
+    if (!title.trim()) return;
+    const newSubtask: PersonalTodoSubtask = {
+      id: 'st-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+      title: title.trim(),
+      isCompleted: false,
+    };
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => {
+        if (t.id !== todoId) return t;
+        return { ...t, subtasks: [...(t.subtasks || []), newSubtask] };
+      })
+    );
+  };
+
+  const deletePersonalTodoSubtask = (todoId: string, subtaskId: string) => {
+    updateAndPersistPersonalTodos(prev =>
+      prev.map(t => {
+        if (t.id !== todoId) return t;
+        return {
+          ...t,
+          subtasks: (t.subtasks || []).filter(st => st.id !== subtaskId),
+        };
+      })
+    );
   };
 
   const rolloverPendingTodos = (targetDate: string): number => {
@@ -1140,7 +1224,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         title: data.title || 'Catatan Baru',
         contentMarkdown: data.contentMarkdown || '',
         linkedDate: data.linkedDate,
-        tags: data.tags || ['Pribadi'],
+        tags: data.tags || ['Rangkuman'],
+        images: data.images || [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1279,11 +1364,15 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         togglePersonalTodo,
         updatePersonalTodo,
         deletePersonalTodo,
+        togglePersonalTodoSubtask,
+        addPersonalTodoSubtask,
+        deletePersonalTodoSubtask,
         rolloverPendingTodos,
         savePersonalNote,
         deletePersonalNote,
         saveSheetLink,
         deleteSheetLink,
+        updateProfile,
       }}
     >
       {children}

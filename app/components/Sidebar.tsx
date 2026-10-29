@@ -18,6 +18,7 @@ import {
   BookOpen,
   X,
   Lock,
+  Settings,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,7 +43,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   if (!currentUser) return null;
 
-  const isMilt = currentUser.role === 'MILT';
+  const isOwner = currentUser.role === 'OWNER';
   const unreadCount = notifications.filter(n => n.userId === currentUser.id && !n.isRead).length;
 
   const todayIso = new Date().toISOString().split('T')[0];
@@ -67,21 +68,31 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside
         className={`fixed inset-y-0 left-0 z-50 md:static md:translate-x-0 transition-transform duration-200 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } w-72 bg-white text-slate-700 h-screen flex flex-col border-r border-slate-200 shrink-0 select-none shadow-xl md:shadow-xs`}
+        } w-64 sm:w-72 ${
+          isOwner ? 'bg-[#6C7EC2] text-white border-r border-[#5C6EB2]' : 'bg-white text-slate-700 border-r border-slate-200'
+        } h-screen flex flex-col shrink-0 select-none shadow-xl md:shadow-xs`}
       >
         {/* 1. Header Workspace */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className={`p-4 border-b flex items-center justify-between ${
+          isOwner ? 'bg-black/10 border-white/10' : 'bg-slate-50/50 border-slate-100'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-sm text-sm">
-              {isMilt ? 'ML' : 'AF'}
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shadow-sm ${
+              isOwner ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'
+            }`}>
+              {isOwner ? 'OW' : 'AF'}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="font-extrabold text-xs text-slate-900 truncate leading-tight">
-                {isMilt ? 'MILT Workspace' : 'Acme Task Flow'}
+              <h1 className={`font-extrabold text-xs truncate leading-tight ${
+                isOwner ? 'text-white' : 'text-slate-900'
+              }`}>
+                {isOwner ? 'Executive Workspace' : 'Acme Task Flow'}
               </h1>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-[11px] text-slate-500 truncate font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className={`text-[11px] truncate font-medium ${
+                  isOwner ? 'text-white/80' : 'text-slate-500'
+                }`}>
                   {currentUser.name}
                 </span>
               </div>
@@ -92,7 +103,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 md:hidden cursor-pointer"
+              className={`p-1 rounded-lg md:hidden cursor-pointer ${
+                isOwner ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-slate-700'
+              }`}
             >
               <X className="w-5 h-5" />
             </button>
@@ -104,39 +117,37 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* ============================================================== */}
           {/* TAMPILAN KHUSUS ROLE MILT (HANYA MENAMPILKAN FITUR SENDIRI)   */}
           {/* ============================================================== */}
-          {isMilt ? (
+          {isOwner ? (
             <div>
-              <div className="px-2 mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <span>Menu</span>
-                <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium normal-case">
-                  <Lock className="w-3 h-3 text-slate-400" />
+              <div className={`px-2 mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider ${
+                isOwner ? 'text-white/60' : 'text-slate-400'
+              }`}>
+                <span>Menu Utama</span>
+                <span className={`flex items-center gap-1 text-[10px] font-medium normal-case ${
+                  isOwner ? 'text-white/60' : 'text-slate-400'
+                }`}>
+                  <Lock className="w-3 h-3" />
                   Privat
                 </span>
               </div>
 
               <nav className="space-y-1">
-                {/* 1. Agenda Harian */}
+                {/* 1. To-Do Harian */}
                 <Link
                   href="/milt/todos"
                   onClick={onClose}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     pathname === '/milt/todos'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <CheckSquare className={`w-4 h-4 ${pathname === '/milt/todos' ? 'text-white' : 'text-indigo-600'}`} />
-                    <span>Agenda</span>
+                    <CheckSquare className="w-4 h-4 text-white" />
+                    <span>To-Do Harian</span>
                   </div>
                   {todayActiveTodosCount > 0 && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        pathname === '/milt/todos'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                      }`}
-                    >
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FFE28A] text-[#634800]">
                       {todayActiveTodosCount}
                     </span>
                   )}
@@ -146,42 +157,56 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Link
                   href="/milt/calendar"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     pathname === '/milt/calendar'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <Calendar className={`w-4 h-4 ${pathname === '/milt/calendar' ? 'text-white' : 'text-blue-600'}`} />
-                  <span>Jadwal</span>
+                  <Calendar className="w-4 h-4 text-white" />
+                  <span>Jadwal & Kalender</span>
                 </Link>
 
                 {/* 3. Catatan */}
                 <Link
                   href="/milt/notes"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     pathname === '/milt/notes'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <BookOpen className={`w-4 h-4 ${pathname === '/milt/notes' ? 'text-white' : 'text-amber-600'}`} />
-                  <span>Catatan</span>
+                  <BookOpen className="w-4 h-4 text-white" />
+                  <span>Catatan Harian</span>
                 </Link>
 
-                {/* 4. Spreadsheet */}
+                {/* 4. Spreadsheet Hub */}
                 <Link
                   href="/milt/sheets"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     pathname === '/milt/sheets'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <Table2 className={`w-4 h-4 ${pathname === '/milt/sheets' ? 'text-white' : 'text-emerald-600'}`} />
-                  <span>Spreadsheet</span>
+                  <Table2 className="w-4 h-4 text-white" />
+                  <span>Spreadsheet Hub</span>
+                </Link>
+
+                {/* 5. Pengaturan Akun */}
+                <Link
+                  href="/settings"
+                  onClick={onClose}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    pathname === '/settings'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-white" />
+                  <span>Pengaturan</span>
                 </Link>
               </nav>
             </div>
@@ -388,6 +413,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <span>Kelola Pengguna</span>
                     </Link>
                   )}
+
+                  <Link
+                    href="/settings"
+                    onClick={onClose}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      pathname === '/settings'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    <Settings className={`w-4 h-4 ${pathname === '/settings' ? 'text-white' : 'text-slate-500'}`} />
+                    <span>Pengaturan Akun</span>
+                  </Link>
                 </nav>
               </div>
             </>
@@ -395,7 +433,49 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* 3. Footer (Hanya untuk Tim) */}
-        {!isMilt && (
+        {/* 3. Footer (Events Distribution Widget for Owner, or Team Status) */}
+        {isOwner ? (
+          <div className="p-4 border-t border-white/10 bg-black/5 space-y-2">
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-extrabold text-white/90 block uppercase tracking-wide">
+                Events Distribution
+              </span>
+              <span className="text-[10px] text-white/60 block">
+                {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+              </span>
+            </div>
+
+            {/* Concentric Curved Arcs matching Image #1 bottom-left */}
+            <div className="pt-1 flex items-center justify-start">
+              <svg className="w-24 h-16" viewBox="0 0 100 65">
+                {/* Mint Arc */}
+                <path
+                  d="M 12 55 A 38 38 0 0 1 88 55"
+                  fill="none"
+                  stroke="#90E5D2"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                />
+                {/* Yellow Arc */}
+                <path
+                  d="M 24 55 A 26 26 0 0 1 76 55"
+                  fill="none"
+                  stroke="#FFE28A"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                />
+                {/* Pink Arc */}
+                <path
+                  d="M 36 55 A 14 14 0 0 1 64 55"
+                  fill="none"
+                  stroke="#F7B6C4"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+        ) : (
           <div className="p-3.5 border-t border-slate-100 bg-slate-50/60">
             <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
               <div className="flex items-center gap-1.5">

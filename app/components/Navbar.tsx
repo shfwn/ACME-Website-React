@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTaskContext } from '@/lib/store/task-store';
-import { Bell, Plus, LogOut, Menu, Calendar as CalendarIcon } from 'lucide-react';
+import { Bell, Plus, LogOut, Menu, Calendar as CalendarIcon, Settings } from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth.actions';
 
 interface NavbarProps {
@@ -19,7 +19,7 @@ export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
 
   if (!currentUser) return null;
 
-  const isMilt = currentUser.role === 'MILT';
+  const isOwner = currentUser.role === 'OWNER';
   const today = new Date();
   const todayIso = today.toISOString().split('T')[0];
   const todayActiveTodosCount = personalTodos.filter(t => t.targetDate === todayIso && !t.isCompleted).length;
@@ -51,20 +51,20 @@ export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        {isMilt ? (
+        {isOwner ? (
           <div className="flex items-center gap-2.5">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-              <CalendarIcon className="w-3.5 h-3.5 text-indigo-600" />
+              <CalendarIcon className="w-3.5 h-3.5 text-[#6C7EC2]" />
               <span>{formattedDate}</span>
             </div>
 
             {todayActiveTodosCount > 0 && (
               <Link
                 href="/milt/todos"
-                className="flex items-center gap-1.5 text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-xl hover:bg-amber-100 transition-colors"
+                className="flex items-center gap-1.5 text-xs font-bold bg-[#FFF9E6] text-[#553C00] border border-[#F2D16C] px-2.5 py-1 rounded-xl hover:bg-[#FFE28A] transition-colors"
                 title={`${todayActiveTodosCount} agenda to-do aktif hari ini`}
               >
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-[#F9C942] animate-pulse" />
                 <span>{todayActiveTodosCount} Agenda Hari Ini</span>
               </Link>
             )}
@@ -81,7 +81,7 @@ export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
       {/* Right: Notifications, Create Task (non-MILT only), User Profile & Logout */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Create Task Button (Only for team roles) */}
-        {!isMilt && onOpenCreateTask && (
+        {!isOwner && onOpenCreateTask && (
           <button
             onClick={onOpenCreateTask}
             className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
@@ -92,7 +92,7 @@ export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
         )}
 
         {/* Notifications Dropdown (Team roles only) */}
-        {!isMilt && (
+        {!isOwner && (
           <div className="relative">
           <button
             onClick={() => setShowNotifMenu(!showNotifMenu)}
@@ -149,25 +149,29 @@ export function Navbar({ onOpenCreateTask, onToggleSidebar }: NavbarProps) {
 
         {/* Profile Card & Logout Button */}
         <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200">
-          <div className="flex items-center gap-2 p-1 px-2.5 rounded-xl bg-slate-50 border border-slate-200">
+          <Link
+            href="/settings"
+            className="flex items-center gap-2 p-1 px-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer group"
+            title="Buka Pengaturan Akun"
+          >
             <img
               src={currentUser.avatarUrl}
               alt={currentUser.name}
               className="w-6 h-6 rounded-full object-cover border border-slate-200"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+                (e.target as HTMLImageElement).src = '/assets/images/profile/user-1.jpg';
               }}
             />
             <div className="text-left hidden sm:block">
-              <div className="text-xs font-bold text-slate-900 leading-tight">
+              <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight">
                 {currentUser.name}
               </div>
               <div className="text-[10px] text-indigo-600 font-semibold font-mono">
                 {currentUser.role}
               </div>
             </div>
-          </div>
-
+            <Settings className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors hidden sm:block ml-1" />
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 rounded-xl transition-all shadow-2xs cursor-pointer"

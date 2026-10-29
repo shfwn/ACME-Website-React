@@ -117,7 +117,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
                 alt={assignee.name}
                 className="w-5 h-5 rounded-full object-cover border border-slate-200"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+                  (e.target as HTMLImageElement).src = '/assets/images/profile/user-1.jpg';
                 }}
               />
               <span className="text-[11px] font-bold text-slate-700">

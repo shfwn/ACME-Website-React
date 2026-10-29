@@ -30,7 +30,7 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const authUser = auth?.user;
       const userRole = authUser && 'role' in authUser && typeof authUser.role === 'string' ? authUser.role : '';
-      const isMilt = userRole === 'MILT';
+      const isOwner = userRole === 'OWNER';
 
       const isOnLogin = nextUrl.pathname === '/login';
       const isMiltRoute = nextUrl.pathname.startsWith('/milt');
@@ -42,34 +42,33 @@ export const authConfig = {
 
       if (isOnLogin) {
         if (isLoggedIn) {
-          return Response.redirect(new URL(isMilt ? '/milt/todos' : '/my-tasks', nextUrl));
+          return Response.redirect(new URL(isOwner ? '/milt/todos' : '/my-tasks', nextUrl));
         }
         return true;
       }
+      // Common Settings route (available for all authenticated roles)
+      if (nextUrl.pathname.startsWith('/settings')) {
+        if (!isLoggedIn) return false;
+        return true;
+      }
 
-      // 1. ISOLASI RUTE MILT (/milt/*):
-      // Hanya role MILT yang berhak mengakses fitur MILT. Role lain langsung dialihkan ke /my-tasks!
+
+      // 1. ISOLASI RUTE PERSONAL (/milt/*):
+      // Hanya role OWNER yang berhak mengakses fitur personal. Role lain langsung dialihkan ke /my-tasks!
       if (isMiltRoute) {
         if (!isLoggedIn) return false;
-        if (!isMilt) {
+        if (!isOwner) {
           return Response.redirect(new URL('/my-tasks', nextUrl));
         }
         return true;
       }
 
       // 2. ISOLASI RUTE TIM:
-      // Role MILT TIDAK BISA mengakses fitur utama role lain! Otomatis dialihkan ke /milt/todos!
+      // Role OWNER memiliki suite personal eksklusif. Rute tim dialihkan ke /milt/todos!
       if (isTeamRoute) {
         if (!isLoggedIn) return false;
-        if (isMilt) {
+        if (isOwner) {
           return Response.redirect(new URL('/milt/todos', nextUrl));
-        }
-
-        // Strict server-side RBAC for /users (khusus OWNER)
-        if (nextUrl.pathname.startsWith('/users')) {
-          if (userRole !== 'OWNER') {
-            return Response.redirect(new URL('/my-tasks', nextUrl));
-          }
         }
         return true;
       }

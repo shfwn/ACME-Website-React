@@ -15,7 +15,7 @@ async function main() {
       name: 'Budi Santoso',
       email: 'budi@company.com',
       passwordHash: defaultPasswordHash,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      avatarUrl: '/assets/images/profile/user-1.jpg',
       weeklyCapacityHours: 40.0,
     },
   });
@@ -27,7 +27,7 @@ async function main() {
       name: 'Siti Rahma',
       email: 'siti@company.com',
       passwordHash: defaultPasswordHash,
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+      avatarUrl: '/assets/images/profile/user-2.jpg',
       weeklyCapacityHours: 35.0,
     },
   });
@@ -38,7 +38,7 @@ async function main() {
       name: 'Andi Pratama',
       email: 'andi@company.com',
       passwordHash: defaultPasswordHash,
-      avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
+      avatarUrl: '/assets/images/profile/user-3.jpg',
       weeklyCapacityHours: 40.0,
     },
   });
@@ -51,7 +51,7 @@ async function main() {
       email: 'milt1058@gmail.com',
       passwordHash: defaultPasswordHash,
       role: Role.MILT,
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      avatarUrl: '/assets/images/profile/user-4.jpg',
       weeklyCapacityHours: 40.0,
     },
   });
@@ -175,7 +175,7 @@ async function main() {
       projectId: project.id,
       creatorId: userBudi.id,
       title: 'Panduan Desain & Arsitektur API V2',
-      contentMarkdown: `# Panduan Integrasi Mobile 2.0\n\nDokumen ini merangkum endpoint API dan spesifikasi design token untuk mobile developer.\n\n### Standar Token\n- Primary Color: #6366F1\n- API Base URL: \`https://api.acme.com/v2\``,
+      contentMarkdown: `# Panduan Integrasi Mobile 2.0\n\nDokumen ini merangkum endpoint API dan spesifikasi design token untuk mobile developer.\n\n### Standar Token\n- Primary Color: #6366F1\n- API Base URL: \`/api/v2\``,
       linkedTaskIds: [taskUI.id, taskFrontend.id, taskBackend.id],
     },
   });

@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { useTaskContext } from '@/lib/store/task-store';
 import { Users, UserPlus, Trash2, Lock } from 'lucide-react';
+import { createUserAction } from '@/app/actions/user.actions';
+import { Role } from '@prisma/client';
 
 export default function UserManagementPage() {
   const { currentUser, users, addUser, updateUserRole, deleteUser } = useTaskContext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
+  const [role, setRole] = useState<Role>(Role.MEMBER);
   const [capacity, setCapacity] = useState<number>(40);
   const [formError, setFormError] = useState('');
 
@@ -27,18 +29,28 @@ export default function UserManagementPage() {
     );
   }
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     const result = addUser(name, email, role, Number(capacity));
     if (!result.success) {
       setFormError(result.error || 'Gagal menambahkan pengguna.');
-    } else {
-      setName('');
-      setEmail('');
-      setRole('MEMBER');
-      setCapacity(40);
+      return;
     }
+    try {
+      await createUserAction({
+        name,
+        email,
+        role,
+        weeklyCapacityHours: Number(capacity),
+      });
+    } catch {
+      // Offline fallback preserved by addUser
+    }
+    setName('');
+    setEmail('');
+    setRole('MEMBER');
+    setCapacity(40);
   };
 
   const getRoleBadgeStyle = (r: string) => {
@@ -158,7 +170,7 @@ export default function UserManagementPage() {
                   alt={user.name}
                   className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+                    (e.target as HTMLImageElement).src = '/assets/images/profile/user-1.jpg';
                   }}
                 />
                 <div>
