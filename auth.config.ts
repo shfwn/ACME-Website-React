@@ -30,16 +30,14 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const authUser = auth?.user;
       const userRole = authUser && 'role' in authUser && typeof authUser.role === 'string' ? authUser.role : '';
-      const isOwner = userRole === 'OWNER';
+      const isOwner = userRole === 'OWNER' || userRole === 'MILT' || authUser?.email?.toLowerCase() === 'milt1058@gmail.com';
 
       const isOnLogin = nextUrl.pathname === '/login';
       const isMiltRoute = nextUrl.pathname.startsWith('/milt');
       const isTeamRoute =
         nextUrl.pathname.startsWith('/my-tasks') ||
         nextUrl.pathname.startsWith('/notifications') ||
-        nextUrl.pathname.startsWith('/projects') ||
-        nextUrl.pathname.startsWith('/users');
-
+        nextUrl.pathname.startsWith('/projects');
       if (isOnLogin) {
         if (isLoggedIn) {
           return Response.redirect(new URL(isOwner ? '/milt/todos' : '/my-tasks', nextUrl));
@@ -51,6 +49,15 @@ export const authConfig = {
         if (!isLoggedIn) return false;
         return true;
       }
+      // User Management route (restricted to OWNER or MILT)
+      if (nextUrl.pathname.startsWith('/users')) {
+        if (!isLoggedIn) return false;
+        if (!isOwner) {
+          return Response.redirect(new URL('/my-tasks', nextUrl));
+        }
+        return true;
+      }
+
 
 
       // 1. ISOLASI RUTE PERSONAL (/milt/*):

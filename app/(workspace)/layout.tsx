@@ -21,9 +21,10 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    // Role OWNER (milt1058@gmail.com): strictly isolated to /milt/* and /settings
-    if (currentUser.role === 'OWNER') {
-      if (!pathname.startsWith('/milt') && !pathname.startsWith('/settings')) {
+    // Role OWNER / MILT (milt1058@gmail.com): access to /milt/*, /settings, and /users
+    const isOwnerRole = currentUser.role === 'OWNER' || currentUser.role === 'MILT';
+    if (isOwnerRole) {
+      if (!pathname.startsWith('/milt') && !pathname.startsWith('/settings') && !pathname.startsWith('/users')) {
         router.push('/milt/todos');
       }
     } else {

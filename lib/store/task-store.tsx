@@ -2,7 +2,24 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { calculateProgress } from '../utils/progress';
-
+import {
+  createTaskAction,
+  updateTaskStatusAction,
+  updateTaskAction,
+  deleteTaskAction,
+} from '@/app/actions/task.actions';
+import {
+  addSubtaskAction,
+  toggleSubtaskAction,
+  deleteSubtaskAction,
+  addCommentAction,
+  deleteCommentAction,
+  addTimeLogAction,
+  deleteTimeLogAction,
+} from '@/app/actions/item.actions';
+import { addDependencyAction, removeDependencyAction } from '@/app/actions/dependency.actions';
+import { saveDocAction, deleteDocAction } from '@/app/actions/doc.actions';
+import { Priority as PrismaPriority } from '@prisma/client';
 export interface User {
   id: string;
   name: string;
@@ -618,8 +635,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       u =>
         u.id === identifier ||
         u.email.toLowerCase() === identifier.trim().toLowerCase() ||
-        (identifier.trim().toLowerCase() === 'milt1058@gmail.com' && u.role === 'OWNER') ||
-        (identifier.trim().toLowerCase() === 'owner@company.com' && u.role === 'OWNER')
+        (identifier.trim().toLowerCase() === 'milt1058@gmail.com' && (u.role === 'OWNER' || u.role === 'MILT')) ||
+        (identifier.trim().toLowerCase() === 'owner@company.com' && (u.role === 'OWNER' || u.role === 'MILT'))
     );
     if (user) {
       setCurrentUser(user);
@@ -751,6 +768,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         return { ...t, subtasks: updatedSubtasks };
       })
     );
+    toggleSubtaskAction(subtaskId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for toggle subtask:', err);
+    });
   };
 
   const addSubtask = (taskId: string, title: string) => {
@@ -768,6 +788,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         return { ...t, subtasks: [...t.subtasks, newSub] };
       })
     );
+    addSubtaskAction(taskId, title.trim()).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for add subtask:', err);
+    });
   };
 
   const deleteSubtask = (taskId: string, subtaskId: string) => {
@@ -777,6 +800,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         return { ...t, subtasks: t.subtasks.filter(s => s.id !== subtaskId) };
       })
     );
+    deleteSubtaskAction(subtaskId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for delete subtask:', err);
+    });
   };
 
   // 2. Update Task Status
@@ -784,6 +810,10 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     const targetStatus = project.statuses.find(s => s.id === newStatusId);
     if (!targetStatus) return;
+
+    updateTaskStatusAction(taskId, newStatusId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for update status:', err);
+    });
 
     updateAndPersistTasks(prev => {
       const task = prev.find(t => t.id === taskId);
@@ -864,6 +894,19 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       ...acts,
     ]);
     showToast('Tugas baru berhasil dibuat.');
+    createTaskAction({
+      projectId: project.id,
+      title: newTask.title,
+      goal: newTask.goal,
+      description: newTask.description,
+      statusId: newTask.statusId,
+      assigneeId: newTask.assigneeId,
+      priority: newTask.priority as PrismaPriority,
+      estimatedHours: newTask.estimatedHours,
+      dueDate: newTask.dueDate,
+    }).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for task creation:', err);
+    });
   };
 
   // 4. Update Task Details (Only Creator or Owner)
@@ -878,6 +921,16 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
     updateAndPersistTasks(prev => prev.map(t => (t.id === taskId ? { ...t, ...data } : t)));
     showToast('Perubahan tugas disimpan.');
+    updateTaskAction(taskId, {
+      title: data.title,
+      description: data.description,
+      assigneeId: data.assigneeId,
+      priority: data.priority ? (data.priority as PrismaPriority) : undefined,
+      estimatedHours: data.estimatedHours,
+      dueDate: data.dueDate,
+    }).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for task update:', err);
+    });
     return true;
   };
 
@@ -894,6 +947,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     updateAndPersistTasks(prev => prev.filter(t => t.id !== taskId));
     if (selectedTaskId === taskId) setSelectedTaskId(null);
     showToast('Tugas telah dihapus.');
+    deleteTaskAction(taskId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for task deletion:', err);
+    });
     return true;
   };
 
@@ -944,6 +1000,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       ...acts,
     ]);
     showToast('Komentar terkirim.');
+    addCommentAction(taskId, content.trim(), mentions).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for comment:', err);
+    });
   };
 
   const deleteComment = (taskId: string, commentId: string) => {
@@ -952,6 +1011,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       prev.map(t => (t.id === taskId ? { ...t, comments: t.comments.filter(c => c.id !== commentId) } : t))
     );
     showToast('Komentar telah dihapus.');
+    deleteCommentAction(commentId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for delete comment:', err);
+    });
   };
 
   // 7. Time Logger with Instant Toast Feedback
@@ -985,6 +1047,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
     const formattedTime = durationMinutes >= 60 ? `${(durationMinutes / 60).toFixed(1)} jam` : `${durationMinutes} menit`;
     showToast(`+${formattedTime} berhasil dicatat ke beban kerja.`);
+    addTimeLogAction(taskId, durationMinutes, note).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for time log:', err);
+    });
   };
 
   const deleteTimeLog = (taskId: string, logId: string) => {
@@ -993,6 +1058,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       prev.map(t => (t.id === taskId ? { ...t, timeLogs: t.timeLogs.filter(tl => tl.id !== logId) } : t))
     );
     showToast('Catatan waktu dihapus.');
+    deleteTimeLogAction(logId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for delete time log:', err);
+    });
   };
 
   // 8. Dependencies
@@ -1031,6 +1099,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     );
 
     showToast('Tugas prasyarat berhasil dihubungkan.');
+    addDependencyAction(taskId, dependsOnTaskId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for add dependency:', err);
+    });
     return { success: true };
   };
 
@@ -1042,6 +1113,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       })
     );
     showToast('Hubungan tugas dihapus.');
+    removeDependencyAction(taskId, dependsOnTaskId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for remove dependency:', err);
+    });
   };
 
   // 9. Docs
@@ -1059,6 +1133,15 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         })
       );
       showToast('Dokumen berhasil disimpan.');
+      saveDocAction({
+        id: docData.id,
+        projectId: docData.projectId || project.id,
+        title: docData.title || 'Dokumen',
+        contentMarkdown: docData.contentMarkdown || '',
+        linkedTaskIds: docData.linkedTaskIds || [],
+      }).catch((err: unknown) => {
+        console.warn('[Sync] Offline/Server sync deferred for doc update:', err);
+      });
       return updatedDoc;
     } else {
       const newDoc: DocWiki = {
@@ -1072,6 +1155,14 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       };
       updateAndPersistDocs(prev => [newDoc, ...prev]);
       showToast('Dokumen berhasil disimpan.');
+      saveDocAction({
+        projectId: newDoc.projectId,
+        title: newDoc.title,
+        contentMarkdown: newDoc.contentMarkdown,
+        linkedTaskIds: newDoc.linkedTaskIds,
+      }).catch((err: unknown) => {
+        console.warn('[Sync] Offline/Server sync deferred for doc create:', err);
+      });
       return newDoc;
     }
   };
@@ -1079,6 +1170,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     updateAndPersistDocs(prev => prev.filter(d => d.id !== docId));
     showToast('Dokumen telah dihapus.');
+    deleteDocAction(docId).catch((err: unknown) => {
+      console.warn('[Sync] Offline/Server sync deferred for doc delete:', err);
+    });
   };
 
   // 10. Notifications

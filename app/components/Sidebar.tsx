@@ -194,6 +194,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <Table2 className="w-4 h-4 text-white" />
                   <span>Spreadsheet Hub</span>
                 </Link>
+                {/* 5. Kelola Pengguna */}
+                <Link
+                  href="/users"
+                  onClick={onClose}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    pathname === '/users'
+                      ? 'bg-white/25 text-white shadow-2xs font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-white" />
+                  <span>Kelola Pengguna</span>
+                </Link>
+
 
                 {/* 5. Pengaturan Akun */}
                 <Link

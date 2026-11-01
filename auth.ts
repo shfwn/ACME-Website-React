@@ -36,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name,
             email: user.email,
             image: user.avatarUrl,
-            role: user.role,
+            role: user.role === 'MILT' ? 'OWNER' : user.role,
           };
         } catch {
           // Safe fallback for offline development before Neon Tech connection is activated
@@ -47,6 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const localTestAccounts: Record<string, { id: string; name: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' }> = {
           'milt1058@gmail.com': { id: 'u-milt', name: 'Owner', role: 'OWNER' },
           'owner@company.com': { id: 'u-milt', name: 'Owner', role: 'OWNER' },
+          'budi@company.com': { id: 'u-budi', name: 'Budi Santoso', role: 'OWNER' },
           'siti@company.com': { id: 'u-siti', name: 'Siti Rahma', role: 'ADMIN' },
           'andi@company.com': { id: 'u-andi', name: 'Andi Pratama', role: 'MEMBER' },
         };

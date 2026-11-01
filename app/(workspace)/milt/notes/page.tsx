@@ -100,6 +100,33 @@ export default function NotesPage() {
       setViewMode('editor');
     }
   };
+  // Create new note from structured template
+  const handleCreateFromTemplate = (templateTitle: string, templateBody: string, forDate?: string) => {
+    const targetDate = forDate || todayStr;
+    const todayFormatted = new Date(targetDate + 'T00:00:00').toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    const newNote = savePersonalNote({
+      title: `${templateTitle} — ${todayFormatted}`,
+      contentMarkdown: templateBody,
+      linkedDate: targetDate,
+      tags: ['Template', 'Jurnal Harian'],
+      images: [],
+    });
+
+    if (newNote) {
+      setActiveNoteId(newNote.id);
+      setTitle(newNote.title);
+      setContentHtml(newNote.contentMarkdown);
+      setLinkedDate(targetDate);
+      setImages([]);
+      setViewMode('editor');
+    }
+  };
+
 
   // Sanitize HTML to prevent stored XSS
   const sanitizeHtml = (raw: string): string => {
@@ -315,6 +342,58 @@ export default function NotesPage() {
       {/* 2. MODE LIST: Grid Semua Catatan */}
       {viewMode === 'list' && (
         <div className="space-y-5">
+          {/* Quick Journal & Meeting Templates Strip */}
+          <div className="bg-white p-4 sm:p-5 rounded-[24px] border border-slate-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#F9C942]" />
+                <span>Template Cepat Jurnal & Notula</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">Klik untuk menulis langsung</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div
+                onClick={() =>
+                  handleCreateFromTemplate(
+                    'Log Kerja & Standup',
+                    `### 💼 Log Kerja Harian (${todayStr})\n\n#### 1. Yang Berhasil Dikerjakan Hari Ini:\n- [x] Tugas utama 1\n- [x] Tugas utama 2\n\n#### 2. Rencana Kerja Selanjutnya:\n- [ ] Target kerja besok\n\n#### 3. Kendala & Catatan:\n- Catatan hambatan koordinasi...\n`
+                  )
+                }
+                className="p-3.5 rounded-2xl bg-[#FFF9E6] border border-[#F2D16C] hover:border-[#E8C45A] hover:shadow-xs transition-all cursor-pointer space-y-1"
+              >
+                <span className="text-xs font-black text-[#553C00] block">💼 Log Standup Harian</span>
+                <p className="text-[11px] text-[#6E4E00] leading-tight">Format pencatatan progres, rencana besok, & kendala kerja.</p>
+              </div>
+
+              <div
+                onClick={() =>
+                  handleCreateFromTemplate(
+                    'Notula Diskusi & Meeting',
+                    `### 🤝 Notula Meeting (${todayStr})\n**Topik / Agenda:** Diskusi Perencanaan\n**Peserta:** \n**Waktu:** \n\n#### Poin Utama Diskusi:\n1. Poin bahasan 1\n2. Poin bahasan 2\n\n#### Tindak Lanjut (Action Items):\n- [ ] PIC 1: Tindak lanjut A\n- [ ] PIC 2: Tindak lanjut B\n`
+                  )
+                }
+                className="p-3.5 rounded-2xl bg-[#EDFAF6] border border-[#74DAC3] hover:border-[#5ECBB3] hover:shadow-xs transition-all cursor-pointer space-y-1"
+              >
+                <span className="text-xs font-black text-[#08483C] block">🤝 Notula & Rangkuman Meeting</span>
+                <p className="text-[11px] text-[#0C5B4C] leading-tight">Format agenda, peserta rapat, dan tindak lanjut (action items).</p>
+              </div>
+
+              <div
+                onClick={() =>
+                  handleCreateFromTemplate(
+                    'Refleksi & Ide Baru',
+                    `### 💡 Refleksi & Evaluasi Diri (${todayStr})\n\n#### Apa yang berjalan baik hari ini?\n- Pencapaian dan hal positif hari ini...\n\n#### Apa yang bisa ditingkatkan besok?\n- Evaluasi fokus atau efisiensi waktu...\n\n#### Ide Baru & Brain Dump:\n- Gagasan penting yang ingin dikembangkan...\n`
+                  )
+                }
+                className="p-3.5 rounded-2xl bg-[#FFF1F4] border border-[#F2AAB9] hover:border-[#E895A6] hover:shadow-xs transition-all cursor-pointer space-y-1"
+              >
+                <span className="text-xs font-black text-[#6E182A] block">💡 Refleksi & Ide Baru</span>
+                <p className="text-[11px] text-[#87253B] leading-tight">Format evaluasi produktivitas harian dan tangkapan ide cepat.</p>
+              </div>
+            </div>
+          </div>
+
           {/* Filter Tabs & Search Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200">

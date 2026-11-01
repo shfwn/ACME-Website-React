@@ -16,8 +16,8 @@ export default function UserManagementPage() {
 
   if (!currentUser) return null;
 
-  // Guard: Only OWNER has access to User Management
-  if (currentUser.role !== 'OWNER') {
+  // Guard: Only OWNER or MILT has access to User Management
+  if (currentUser.role !== 'OWNER' && currentUser.role !== 'MILT') {
     return (
       <div className="max-w-2xl mx-auto p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
         <Lock className="w-10 h-10 text-slate-400 mx-auto" />

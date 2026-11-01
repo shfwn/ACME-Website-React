@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTaskContext, Priority, PersonalTodoColor } from '@/lib/store/task-store';
+import { exportMultiTabSpreadsheet } from '@/lib/utils/spreadsheet-export';
 import {
   CheckCircle2,
   Circle,
@@ -19,8 +20,8 @@ import {
   ChevronDown,
   ChevronUp,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
-
 export default function PersonalTodosPage() {
   const {
     currentUser,
@@ -251,6 +252,58 @@ export default function PersonalTodosPage() {
     }
     setQuickNoteText('');
   };
+  // 1-Click Evening Reflection & Auto-Journaling State & Handler
+  const [reflectionSuccess, setReflectionSuccess] = useState(false);
+
+  const handleGenerateDailyReflection = () => {
+    const done = dateTodos.filter(t => t.isCompleted);
+    const pending = dateTodos.filter(t => !t.isCompleted);
+
+    const doneText = done.length > 0
+      ? done.map(t => `- [x] **${t.title}** (${t.startTime || '--:--'} - ${t.endTime || '--:--'}) [${t.category}]`).join('\n')
+      : '- Tidak ada agenda selesai.';
+
+    const pendingText = pending.length > 0
+      ? pending.map(t => `- [ ] ${t.title} (${t.priority}) [${t.category}]`).join('\n')
+      : '- Semua agenda tuntas diselesaikan!';
+
+    const md = `### 📋 Rekap & Evaluasi Harian (${formatReadableDate(selectedDate)})
+**Tingkat Penyelesaian:** ${progressPercent}% (${completedCount}/${totalCount} agenda)
+**Total Jam Terjadwal:** ${scheduledHoursDisplay} (${freeHoursDisplay} waktu luang)
+
+#### Agenda Selesai:
+${doneText}
+
+#### Agenda Tertunda / Perlu Ditindaklanjuti:
+${pendingText}
+
+---
+#### Catatan & Refleksi Hari Ini:
+- Tulis evaluasi atau catatan kerja tambahan Anda di sini...
+`;
+
+    if (currentDayNote) {
+      savePersonalNote({
+        id: currentDayNote.id,
+        contentMarkdown: currentDayNote.contentMarkdown + '\n\n' + md,
+      });
+    } else {
+      savePersonalNote({
+        title: `Jurnal & Evaluasi — ${formatReadableDate(selectedDate)}`,
+        linkedDate: selectedDate,
+        contentMarkdown: md,
+        tags: ['Evaluasi Harian', 'Logbook', 'Rekap Otomatis'],
+      });
+    }
+
+    setReflectionSuccess(true);
+    setTimeout(() => setReflectionSuccess(false), 4000);
+  };
+
+  const handleExportXLSX = () => {
+    exportMultiTabSpreadsheet(personalTodos, personalNotes, `rekap-todo-${selectedDate}`);
+  };
+
 
   // Pastel card style map extracted from Image #1
   const cardThemeStyles: Record<
@@ -355,15 +408,15 @@ export default function PersonalTodosPage() {
               </button>
             </div>
 
-            {/* Direct Spreadsheet Conversion Buttons */}
-            <div className="flex items-center gap-1.5">
+            {/* Direct Spreadsheet Conversion & Journaling Buttons */}
+            <div className="flex items-center flex-wrap gap-1.5">
               <button
-                onClick={handleExportCSV}
-                title="Download CSV Spreadsheet"
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                onClick={handleGenerateDailyReflection}
+                title="Otomatis menyusun evaluasi capaian hari ini ke Jurnal Catatan"
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#FFF9E6] hover:bg-[#FFE28A] text-[#553C00] border border-[#F2D16C] rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-2xs"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Export CSV</span>
+                <Sparkles className="w-3.5 h-3.5 text-[#F9C942]" />
+                <span>Rekap ke Jurnal</span>
               </button>
 
               <button
@@ -382,6 +435,15 @@ export default function PersonalTodosPage() {
                     <span>Copy Sheet</span>
                   </>
                 )}
+              </button>
+
+              <button
+                onClick={handleExportXLSX}
+                title="Download seluruh agenda & catatan dalam file Excel multi-tab"
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export Excel</span>
               </button>
             </div>
           </div>
@@ -453,6 +515,22 @@ export default function PersonalTodosPage() {
           </div>
         </div>
       </div>
+      {/* Success Notification for Daily Reflection Auto-Journal */}
+      {reflectionSuccess && (
+        <div className="bg-[#EDFAF6] border border-[#74DAC3] text-[#08483C] p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-in fade-in shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>Jurnal & evaluasi capaian untuk tanggal {formatReadableDate(selectedDate)} berhasil disusun dan disimpan ke Catatan!</span>
+          </div>
+          <Link
+            href="/milt/notes"
+            className="px-3 py-1.5 bg-[#08483C] hover:bg-[#063C32] text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
+          >
+            Buka Catatan &rarr;
+          </Link>
+        </div>
+      )}
+
 
       {/* 3. Daily Rollover Engine Alert (if overdue pending exist) */}
       {pendingOverdue.length > 0 && selectedDate >= todayStr && (

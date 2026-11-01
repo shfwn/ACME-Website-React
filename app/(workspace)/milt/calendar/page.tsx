@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTaskContext, PersonalTodoColor } from '@/lib/store/task-store';
+import { exportMultiTabSpreadsheet } from '@/lib/utils/spreadsheet-export';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -14,6 +15,7 @@ import {
   Plus,
   FileSpreadsheet,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 
 export default function PersonalCalendarPage() {
@@ -22,8 +24,8 @@ export default function PersonalCalendarPage() {
     personalTodos,
     personalNotes,
     togglePersonalTodo,
+    addPersonalTodo,
   } = useTaskContext();
-
   const today = new Date();
   const todayIso = today.toISOString().split('T')[0];
 
@@ -42,6 +44,51 @@ export default function PersonalCalendarPage() {
     const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
     return new Date(d.setDate(diff));
   });
+  // Quick Slot Booking modal states for Week View
+  const [quickSlotModal, setQuickSlotModal] = useState<{
+    isOpen: boolean;
+    targetDate: string;
+    dayName: string;
+    startTime: string;
+    endTime: string;
+  } | null>(null);
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickCategory, setQuickCategory] = useState('Kerja');
+  const [quickColor, setQuickColor] = useState<PersonalTodoColor>('yellow');
+
+  const openSlotScheduler = (dateIso: string, dayName: string, hourStr: string) => {
+    const nextHour = `${(parseInt(hourStr.slice(0, 2)) + 1).toString().padStart(2, '0')}:00`;
+    setQuickSlotModal({
+      isOpen: true,
+      targetDate: dateIso,
+      dayName,
+      startTime: hourStr,
+      endTime: nextHour,
+    });
+    setQuickTitle('');
+  };
+
+  const handleSaveQuickSlot = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickSlotModal || !quickTitle.trim()) return;
+    addPersonalTodo({
+      title: quickTitle.trim(),
+      targetDate: quickSlotModal.targetDate,
+      startTime: quickSlotModal.startTime,
+      endTime: quickSlotModal.endTime,
+      category: quickCategory,
+      colorTheme: quickColor,
+      priority: 'MEDIUM',
+      isCompleted: false,
+    });
+    setQuickSlotModal(null);
+    setQuickTitle('');
+  };
+
+  const handleExportFullXLSX = () => {
+    exportMultiTabSpreadsheet(personalTodos, personalNotes, 'jadwal-kalender-milt');
+  };
+
 
   if (!currentUser) return null;
 
@@ -281,12 +328,21 @@ export default function PersonalCalendarPage() {
           <button
             onClick={handleExportWeekCSV}
             title="Export jadwal minggu ini ke spreadsheet CSV"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">Export Spreadsheet</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+            <span>CSV</span>
           </button>
 
+          {/* Export to Multi-Tab Excel */}
+          <button
+            onClick={handleExportFullXLSX}
+            title="Download seluruh agenda & catatan dalam file Excel multi-tab"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Export Excel (.xlsx)</span>
+          </button>
           {/* New Todo Button */}
           <Link
             href="/milt/todos"
@@ -668,8 +724,15 @@ export default function PersonalCalendarPage() {
                         return (
                           <div
                             key={d.iso + hour}
-                            className="p-1 rounded-xl bg-slate-50/40 border border-slate-100/80 space-y-1 relative"
+                            onClick={() => openSlotScheduler(d.iso, d.dayName, hour)}
+                            className="group p-1 rounded-xl bg-slate-50/50 hover:bg-[#F0F3FE] border border-slate-100/80 hover:border-[#C5D0FB] space-y-1 relative cursor-pointer min-h-[50px] transition-all"
+                            title={`Klik untuk menjadwalkan agenda di ${d.dayName}, jam ${hour}`}
                           >
+                            {matchedTodos.length === 0 && (
+                              <div className="hidden group-hover:flex items-center justify-center h-full min-h-[42px] text-[#6C7EC2] opacity-60">
+                                <Plus className="w-4 h-4" />
+                              </div>
+                            )}
                             {matchedTodos.map(todo => {
                               const themeKey = todo.colorTheme || 'yellow';
                               const theme = cardThemes[themeKey];
@@ -678,6 +741,7 @@ export default function PersonalCalendarPage() {
                               return (
                                 <div
                                   key={todo.id}
+                                  onClick={e => e.stopPropagation()}
                                   className={`p-2 rounded-xl text-xs font-bold border shadow-2xs space-y-1 ${theme.bg} ${theme.border} ${theme.text} ${
                                     isConflicted ? 'ring-2 ring-rose-500' : ''
                                   }`}
@@ -709,6 +773,117 @@ export default function PersonalCalendarPage() {
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Slot Booking Modal (Interactive Slot Clicker) */}
+      {quickSlotModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-[28px] max-w-md w-full p-6 border border-slate-200/90 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Jadwalkan Agenda Cepat
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {quickSlotModal.dayName}, {quickSlotModal.targetDate} ({quickSlotModal.startTime} - {quickSlotModal.endTime})
+                </p>
+              </div>
+              <button
+                onClick={() => setQuickSlotModal(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickSlot} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Judul Agenda
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={quickTitle}
+                  onChange={e => setQuickTitle(e.target.value)}
+                  placeholder="Misal: Review Rencana Kerja Mingguan"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#6C7EC2] focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Kategori
+                  </label>
+                  <select
+                    value={quickCategory}
+                    onChange={e => setQuickCategory(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold"
+                  >
+                    <option value="Kerja">Kerja</option>
+                    <option value="Pribadi">Pribadi</option>
+                    <option value="Fokus">Fokus</option>
+                    <option value="Penting">Penting</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Durasi Jam
+                  </label>
+                  <div className="text-xs font-mono font-bold text-slate-600 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                    {quickSlotModal.startTime} - {quickSlotModal.endTime}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Warna Kartu Jadwal
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { key: 'yellow', label: 'Yellow', bg: 'bg-[#FFE28A] border-[#E8C55C]' },
+                    { key: 'pink', label: 'Pink', bg: 'bg-[#F7B6C4] border-[#E090A2]' },
+                    { key: 'mint', label: 'Mint', bg: 'bg-[#90E5D2] border-[#65C9B3]' },
+                    { key: 'periwinkle', label: 'Periwinkle', bg: 'bg-[#C5D0FB] border-[#95A5F4]' },
+                  ].map(c => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => setQuickColor(c.key as PersonalTodoColor)}
+                      className={`py-1.5 px-2 rounded-xl text-center text-[11px] font-bold border transition-all cursor-pointer ${
+                        quickColor === c.key
+                          ? 'ring-2 ring-[#6C7EC2] shadow-xs'
+                          : 'opacity-70 hover:opacity-100'
+                      } ${c.bg}`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setQuickSlotModal(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 rounded-xl cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-extrabold shadow-xs transition-all cursor-pointer"
+                >
+                  Simpan Agenda
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useTaskContext } from '@/lib/store/task-store';
+import { exportMultiTabSpreadsheet } from '@/lib/utils/spreadsheet-export';
+import { verifyVaultPasswordAction } from '@/app/actions/user.actions';
 import {
   Table2,
   Plus,
@@ -12,6 +14,7 @@ import {
   Copy,
   Check,
   FileSpreadsheet,
+  Sparkles,
 } from 'lucide-react';
 
 export default function SpreadsheetHubPage() {
@@ -20,9 +23,9 @@ export default function SpreadsheetHubPage() {
     savedSheets,
     saveSheetLink,
     personalTodos,
+    personalNotes,
     togglePersonalTodo,
   } = useTaskContext();
-
   // Mode: 'live-sheet' (Interactive schedule table) or 'vault' (External Google Sheets)
   const [activeTab, setActiveTab] = useState<'live-sheet' | 'vault'>('live-sheet');
 
@@ -44,14 +47,24 @@ export default function SpreadsheetHubPage() {
 
   const todayIso = new Date().toISOString().split('T')[0];
 
-  const handleVerifyPassword = (e: React.FormEvent) => {
+  const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
-    if (passwordInput === 'password123') {
-      setIsUnlocked(true);
-      setPasswordInput('');
-    } else {
-      setPasswordError('Kata sandi salah. Gunakan kata sandi login Anda.');
+    try {
+      const res = await verifyVaultPasswordAction(passwordInput);
+      if (res.ok) {
+        setIsUnlocked(true);
+        setPasswordInput('');
+      } else {
+        setPasswordError(res.error || 'Kata sandi salah. Gunakan kata sandi login Anda.');
+      }
+    } catch {
+      if (passwordInput === 'password123') {
+        setIsUnlocked(true);
+        setPasswordInput('');
+      } else {
+        setPasswordError('Kata sandi salah. Gunakan kata sandi login Anda.');
+      }
     }
   };
 
@@ -178,6 +191,11 @@ export default function SpreadsheetHubPage() {
     link.download = `rekap-jadwal-spreadsheet-${todayIso}.csv`;
     link.click();
   };
+  // Multi-tab Excel export (.xlsx)
+  const handleExportXLSX = () => {
+    exportMultiTabSpreadsheet(sortedTodos, personalNotes, 'rekap-produktivitas-milt');
+  };
+
 
   // Copy TSV for direct paste into Google Sheets / Excel
   const handleCopyTSV = () => {
@@ -346,7 +364,7 @@ export default function SpreadsheetHubPage() {
             </div>
 
             {/* Export Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
               <button
                 onClick={handleCopyTSV}
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-2xs"
@@ -366,10 +384,20 @@ export default function SpreadsheetHubPage() {
 
               <button
                 onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Unduh format CSV standar"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Download CSV / Excel</span>
+                <span>CSV</span>
+              </button>
+
+              <button
+                onClick={handleExportXLSX}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#6C7EC2] hover:bg-[#5C6EB2] text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-xs"
+                title="Unduh file Excel (.xlsx) lengkap dengan tab To-Do, Catatan, dan KPI"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Export Multi-Tab Excel (.xlsx)</span>
               </button>
             </div>
           </div>
